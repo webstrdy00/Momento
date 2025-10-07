@@ -1,0 +1,8 @@
+/logs
+/docs
+
+.claude/
+CLAUDE.md
+CLAUDE-*.md
+
+AGENTS.md
