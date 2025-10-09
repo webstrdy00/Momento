@@ -1,14 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-
-const COLORS = {
-  darkNavy: "#1a1d29",
-  deepGray: "#2d2f3e",
-  gold: "#d4af37",
-  red: "#e74c3c",
-  white: "#ffffff",
-  lightGray: "#a0a0a0",
-}
+import { COLORS } from "../constants/colors"
 
 export default function ProfileScreen() {
   const menuItems = [

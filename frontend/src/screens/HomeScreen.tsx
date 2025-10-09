@@ -2,16 +2,9 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
 import { LinearGradient } from "expo-linear-gradient"
+import { COLORS } from "../constants/colors"
 
 const { width } = Dimensions.get("window")
-const COLORS = {
-  darkNavy: "#1a1d29",
-  deepGray: "#2d2f3e",
-  gold: "#d4af37",
-  red: "#e74c3c",
-  white: "#ffffff",
-  lightGray: "#a0a0a0",
-}
 
 export default function HomeScreen() {
   const navigation = useNavigation()
