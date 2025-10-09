@@ -11,6 +11,7 @@ import StatsScreen from "./src/screens/StatsScreen"
 import ProfileScreen from "./src/screens/ProfileScreen"
 import MovieDetailScreen from "./src/screens/MovieDetailScreen"
 import MovieSearchScreen from "./src/screens/MovieSearchScreen"
+import CollectionDetailScreen from "./src/screens/CollectionDetailScreen"
 
 // Types
 import type { RootStackParamList, TabParamList } from "./src/types"
@@ -100,6 +101,13 @@ export default function App() {
           options={{
             headerShown: false,
             presentation: "modal",
+          }}
+        />
+        <Stack.Screen
+          name="CollectionDetail"
+          component={CollectionDetailScreen}
+          options={{
+            headerShown: false,
           }}
         />
       </Stack.Navigator>

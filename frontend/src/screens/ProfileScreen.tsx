@@ -1,8 +1,22 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
+import { useNavigation } from "@react-navigation/native"
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { COLORS } from "../constants/colors"
+import type { RootStackParamList } from "../types"
+
+type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<ProfileScreenNavigationProp>()
+
+  // Mock 컬렉션 데이터
+  const collections = [
+    { id: 1, name: "크리스토퍼 놀란 영화", movieCount: 5, isAuto: false },
+    { id: 2, name: "액션 명작", movieCount: 12, isAuto: false },
+    { id: 3, name: "2024년 본 영화", movieCount: 8, isAuto: true },
+  ]
+
   const menuItems = [
     { icon: "person-outline", label: "프로필 수정", action: "editProfile" },
     { icon: "notifications-outline", label: "알림 설정", action: "notifications" },
@@ -39,6 +53,46 @@ export default function ProfileScreen() {
             <Text style={styles.statValue}>22</Text>
             <Text style={styles.statLabel}>연속 기록</Text>
           </View>
+        </View>
+      </View>
+
+      {/* Collections Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleRow}>
+            <Ionicons name="folder-outline" size={20} color={COLORS.gold} />
+            <Text style={styles.sectionTitle}>내 컬렉션</Text>
+          </View>
+        </View>
+
+        {/* Collection List */}
+        <View style={styles.collectionList}>
+          {collections.map((collection) => (
+            <TouchableOpacity
+              key={collection.id}
+              style={styles.collectionItem}
+              onPress={() => navigation.navigate("CollectionDetail", { id: collection.id })}
+            >
+              <View style={styles.collectionLeft}>
+                <Ionicons
+                  name={collection.isAuto ? "sparkles" : "folder"}
+                  size={20}
+                  color={collection.isAuto ? COLORS.gold : COLORS.white}
+                />
+                <View style={styles.collectionInfo}>
+                  <Text style={styles.collectionName}>{collection.name}</Text>
+                  <Text style={styles.collectionCount}>{collection.movieCount}편</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.lightGray} />
+            </TouchableOpacity>
+          ))}
+
+          {/* Add New Collection Button */}
+          <TouchableOpacity style={styles.addCollectionButton}>
+            <Ionicons name="add-circle-outline" size={20} color={COLORS.gold} />
+            <Text style={styles.addCollectionText}>새 컬렉션 만들기</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -131,6 +185,73 @@ const styles = StyleSheet.create({
     width: 1,
     height: 30,
     backgroundColor: COLORS.darkNavy,
+  },
+  section: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: COLORS.white,
+  },
+  collectionList: {
+    gap: 8,
+  },
+  collectionItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: COLORS.deepGray,
+    padding: 16,
+    borderRadius: 12,
+  },
+  collectionLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  collectionInfo: {
+    flex: 1,
+  },
+  collectionName: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: COLORS.white,
+    marginBottom: 2,
+  },
+  collectionCount: {
+    fontSize: 13,
+    color: COLORS.lightGray,
+  },
+  addCollectionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(212, 175, 55, 0.1)",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.gold,
+    borderStyle: "dashed",
+    gap: 8,
+  },
+  addCollectionText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.gold,
   },
   menuSection: {
     marginHorizontal: 20,
