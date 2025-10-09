@@ -11,18 +11,14 @@ import StatsScreen from "./src/screens/StatsScreen"
 import ProfileScreen from "./src/screens/ProfileScreen"
 import MovieDetailScreen from "./src/screens/MovieDetailScreen"
 
-// Colors
-const COLORS = {
-  darkNavy: "#1a1d29",
-  deepGray: "#2d2f3e",
-  gold: "#d4af37",
-  red: "#e74c3c",
-  white: "#ffffff",
-  lightGray: "#a0a0a0",
-}
+// Types
+import type { RootStackParamList, TabParamList } from "./src/types"
 
-const Tab = createBottomTabNavigator()
-const Stack = createNativeStackNavigator()
+// Colors
+import { COLORS } from "./src/constants/colors"
+
+const Tab = createBottomTabNavigator<TabParamList>()
+const Stack = createNativeStackNavigator<RootStackParamList>()
 
 function TabNavigator() {
   return (

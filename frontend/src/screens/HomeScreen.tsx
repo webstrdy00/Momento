@@ -1,15 +1,19 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { LinearGradient } from "expo-linear-gradient"
 import { COLORS } from "../constants/colors"
 import MovieCard from "../components/MovieCard"
 import StatCard from "../components/StatCard"
+import type { RootStackParamList } from "../types"
 
 const { width } = Dimensions.get("window")
 
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
+
 export default function HomeScreen() {
-  const navigation = useNavigation()
+  const navigation = useNavigation<HomeScreenNavigationProp>()
 
   const currentMovie = {
     id: 1,

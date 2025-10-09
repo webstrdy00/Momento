@@ -2,12 +2,16 @@ import { useState } from "react"
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, FlatList } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { COLORS } from "../constants/colors"
 import MovieCard from "../components/MovieCard"
 import FilterChip from "../components/FilterChip"
+import type { RootStackParamList } from "../types"
+
+type MoviesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
 
 export default function MoviesScreen() {
-  const navigation = useNavigation()
+  const navigation = useNavigation<MoviesScreenNavigationProp>()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedFilter, setSelectedFilter] = useState("all")
 
