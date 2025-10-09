@@ -1,8 +1,10 @@
 import { useState } from "react"
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput, FlatList } from "react-native"
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, FlatList } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
 import { COLORS } from "../constants/colors"
+import MovieCard from "../components/MovieCard"
+import FilterChip from "../components/FilterChip"
 
 export default function MoviesScreen() {
   const navigation = useNavigation()
@@ -55,27 +57,20 @@ export default function MoviesScreen() {
   ]
 
   const filters = [
-    { id: "all", label: "전체", icon: "apps" },
-    { id: "watching", label: "보는 중", icon: "play-circle" },
-    { id: "completed", label: "완료", icon: "checkmark-circle" },
-    { id: "watchlist", label: "보고 싶은", icon: "bookmark" },
+    { id: "all", label: "전체" },
+    { id: "watching", label: "보는 중" },
+    { id: "completed", label: "완료" },
+    { id: "watchlist", label: "보고 싶은" },
   ]
 
   const renderMovieCard = ({ item }) => (
-    <TouchableOpacity style={styles.movieCard} onPress={() => navigation.navigate("MovieDetail", { id: item.id })}>
-      <Image source={{ uri: item.poster }} style={styles.moviePoster} />
-      <View style={styles.movieCardOverlay}>
-        {item.rating > 0 && (
-          <View style={styles.ratingBadge}>
-            <Ionicons name="star" size={12} color={COLORS.gold} />
-            <Text style={styles.ratingText}>{item.rating}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={styles.movieCardTitle} numberOfLines={2}>
-        {item.title}
-      </Text>
-    </TouchableOpacity>
+    <View style={styles.movieCardWrapper}>
+      <MovieCard
+        movie={item}
+        onPress={() => navigation.navigate("MovieDetail", { id: item.id })}
+        showRating={true}
+      />
+    </View>
   )
 
   return (
@@ -103,20 +98,12 @@ export default function MoviesScreen() {
       {/* Filters */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filtersContainer}>
         {filters.map((filter) => (
-          <TouchableOpacity
+          <FilterChip
             key={filter.id}
-            style={[styles.filterButton, selectedFilter === filter.id && styles.filterButtonActive]}
+            label={filter.label}
+            isActive={selectedFilter === filter.id}
             onPress={() => setSelectedFilter(filter.id)}
-          >
-            <Ionicons
-              name={filter.icon}
-              size={18}
-              color={selectedFilter === filter.id ? COLORS.darkNavy : COLORS.gold}
-            />
-            <Text style={[styles.filterText, selectedFilter === filter.id && styles.filterTextActive]}>
-              {filter.label}
-            </Text>
-          </TouchableOpacity>
+          />
         ))}
       </ScrollView>
 
@@ -172,63 +159,13 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     gap: 8,
   },
-  filterButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.deepGray,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    gap: 6,
-  },
-  filterButtonActive: {
-    backgroundColor: COLORS.gold,
-  },
-  filterText: {
-    color: COLORS.gold,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  filterTextActive: {
-    color: COLORS.darkNavy,
-  },
   moviesGrid: {
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-  movieCard: {
+  movieCardWrapper: {
     flex: 1,
     margin: 6,
     maxWidth: "48%",
-  },
-  moviePoster: {
-    width: "100%",
-    aspectRatio: 2 / 3,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  movieCardOverlay: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-  },
-  ratingBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(26, 29, 41, 0.9)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  ratingText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  movieCardTitle: {
-    fontSize: 14,
-    color: COLORS.white,
-    fontWeight: "500",
   },
 })

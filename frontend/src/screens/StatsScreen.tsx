@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, Dimensions } from "react-native"
-import { Ionicons } from "@expo/vector-icons"
 import { COLORS } from "../constants/colors"
+import StatCard from "../components/StatCard"
 
 const { width } = Dimensions.get("window")
 
@@ -74,26 +74,10 @@ export default function StatsScreen() {
 
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Ionicons name="film" size={32} color={COLORS.gold} />
-          <Text style={styles.statValue}>45편</Text>
-          <Text style={styles.statLabel}>총 관람</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="star" size={32} color={COLORS.gold} />
-          <Text style={styles.statValue}>4.2</Text>
-          <Text style={styles.statLabel}>평균 별점</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="time" size={32} color={COLORS.gold} />
-          <Text style={styles.statValue}>120시간</Text>
-          <Text style={styles.statLabel}>총 시청 시간</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="calendar" size={32} color={COLORS.gold} />
-          <Text style={styles.statValue}>22일</Text>
-          <Text style={styles.statLabel}>연속 기록</Text>
-        </View>
+        <StatCard title="총 관람" value="45편" icon="film" color={COLORS.gold} />
+        <StatCard title="평균 별점" value="4.2" icon="star" color={COLORS.gold} />
+        <StatCard title="총 시청 시간" value="120시간" icon="time" color={COLORS.gold} />
+        <StatCard title="연속 기록" value="22일" icon="calendar" color={COLORS.gold} />
       </View>
 
       {/* Genre Stats */}
@@ -238,24 +222,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 24,
     gap: 12,
-  },
-  statCard: {
-    width: (width - 52) / 2,
-    backgroundColor: COLORS.deepGray,
-    padding: 20,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: COLORS.white,
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 13,
-    color: COLORS.lightGray,
-    marginTop: 4,
   },
   genreItem: {
     flexDirection: "row",

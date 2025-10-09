@@ -3,6 +3,8 @@ import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
 import { LinearGradient } from "expo-linear-gradient"
 import { COLORS } from "../constants/colors"
+import MovieCard from "../components/MovieCard"
+import StatCard from "../components/StatCard"
 
 const { width } = Dimensions.get("window")
 
@@ -67,21 +69,24 @@ export default function HomeScreen() {
 
       {/* Stats Section */}
       <View style={styles.statsSection}>
-        <View style={styles.statCard}>
-          <Ionicons name="calendar-outline" size={32} color={COLORS.gold} />
-          <Text style={styles.statValue}>22일째</Text>
-          <Text style={styles.statLabel}>연속 기록</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="film-outline" size={32} color={COLORS.gold} />
-          <Text style={styles.statValue}>12편</Text>
-          <Text style={styles.statLabel}>이번 달</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="star-outline" size={32} color={COLORS.gold} />
-          <Text style={styles.statValue}>4.2</Text>
-          <Text style={styles.statLabel}>평균 별점</Text>
-        </View>
+        <StatCard
+          title="연속 기록"
+          value="22일째"
+          icon="calendar-outline"
+          color={COLORS.gold}
+        />
+        <StatCard
+          title="이번 달"
+          value="12편"
+          icon="film-outline"
+          color={COLORS.gold}
+        />
+        <StatCard
+          title="평균 별점"
+          value="4.2"
+          icon="star-outline"
+          color={COLORS.gold}
+        />
       </View>
 
       {/* Watchlist Section */}
@@ -94,16 +99,11 @@ export default function HomeScreen() {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.movieList}>
           {watchlistMovies.map((movie) => (
-            <TouchableOpacity
+            <MovieCard
               key={movie.id}
-              style={styles.movieCard}
+              movie={{ ...movie, status: "wishlist" as const }}
               onPress={() => navigation.navigate("MovieDetail", { id: movie.id })}
-            >
-              <Image source={{ uri: movie.poster }} style={styles.moviePoster} />
-              <Text style={styles.movieTitle} numberOfLines={2}>
-                {movie.title}
-              </Text>
-            </TouchableOpacity>
+            />
           ))}
         </ScrollView>
       </View>
@@ -212,24 +212,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     gap: 12,
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.deepGray,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: COLORS.white,
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.lightGray,
-    marginTop: 4,
-  },
   section: {
     marginBottom: 24,
   },
@@ -252,20 +234,6 @@ const styles = StyleSheet.create({
   movieList: {
     paddingHorizontal: 20,
     gap: 12,
-  },
-  movieCard: {
-    width: 120,
-  },
-  moviePoster: {
-    width: 120,
-    height: 180,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  movieTitle: {
-    fontSize: 13,
-    color: COLORS.white,
-    fontWeight: "500",
   },
   quickActions: {
     flexDirection: "row",
