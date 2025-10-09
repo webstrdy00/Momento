@@ -10,6 +10,7 @@ import MoviesScreen from "./src/screens/MoviesScreen"
 import StatsScreen from "./src/screens/StatsScreen"
 import ProfileScreen from "./src/screens/ProfileScreen"
 import MovieDetailScreen from "./src/screens/MovieDetailScreen"
+import MovieSearchScreen from "./src/screens/MovieSearchScreen"
 
 // Types
 import type { RootStackParamList, TabParamList } from "./src/types"
@@ -93,6 +94,14 @@ export default function App() {
       >
         <Stack.Screen name="Main" component={TabNavigator} options={{ headerShown: false }} />
         <Stack.Screen name="MovieDetail" component={MovieDetailScreen} options={{ title: "영화 상세" }} />
+        <Stack.Screen
+          name="MovieSearch"
+          component={MovieSearchScreen}
+          options={{
+            headerShown: false,
+            presentation: "modal",
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   )

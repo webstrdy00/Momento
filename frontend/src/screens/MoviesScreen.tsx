@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, FlatList } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
@@ -6,14 +6,24 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { COLORS } from "../constants/colors"
 import MovieCard from "../components/MovieCard"
 import FilterChip from "../components/FilterChip"
-import type { RootStackParamList } from "../types"
+import type { RootStackParamList, MovieStatus } from "../types"
 
 type MoviesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
 
 export default function MoviesScreen() {
   const navigation = useNavigation<MoviesScreenNavigationProp>()
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedFilter, setSelectedFilter] = useState("all")
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
+  const [selectedFilter, setSelectedFilter] = useState<"all" | MovieStatus>("all")
+
+  // Debounce search query (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const movies = [
     {
@@ -67,14 +77,35 @@ export default function MoviesScreen() {
     { id: "watchlist", label: "보고 싶은" },
   ]
 
-  const renderMovieCard = ({ item }) => (
-    <View style={styles.movieCardWrapper}>
-      <MovieCard
-        movie={item}
-        onPress={() => navigation.navigate("MovieDetail", { id: item.id })}
-        showRating={true}
-      />
-    </View>
+  // Filter and search logic
+  const filteredMovies = useMemo(() => {
+    let result = movies
+
+    // Apply status filter
+    if (selectedFilter !== "all") {
+      result = result.filter((movie) => movie.status === selectedFilter)
+    }
+
+    // Apply search filter (debounced)
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase().trim()
+      result = result.filter((movie) => movie.title.toLowerCase().includes(query))
+    }
+
+    return result
+  }, [movies, selectedFilter, debouncedSearchQuery])
+
+  const renderMovieCard = useCallback(
+    ({ item }: { item: typeof movies[0] }) => (
+      <View style={styles.movieCardWrapper}>
+        <MovieCard
+          movie={item}
+          onPress={() => navigation.navigate("MovieDetail", { id: item.id })}
+          showRating={true}
+        />
+      </View>
+    ),
+    [navigation]
   )
 
   return (
@@ -82,7 +113,7 @@ export default function MoviesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>내 영화</Text>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate("MovieSearch")}>
           <Ionicons name="add-circle" size={28} color={COLORS.gold} />
         </TouchableOpacity>
       </View>
@@ -113,12 +144,21 @@ export default function MoviesScreen() {
 
       {/* Movies Grid */}
       <FlatList
-        data={movies}
+        data={filteredMovies}
         renderItem={renderMovieCard}
         keyExtractor={(item) => item.id.toString()}
         numColumns={2}
         contentContainerStyle={styles.moviesGrid}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="film-outline" size={64} color={COLORS.lightGray} />
+            <Text style={styles.emptyTitle}>영화를 찾을 수 없습니다</Text>
+            <Text style={styles.emptySubtitle}>
+              {searchQuery ? "다른 검색어를 시도해보세요" : "필터를 변경해보세요"}
+            </Text>
+          </View>
+        }
       />
     </View>
   )
@@ -171,5 +211,25 @@ const styles = StyleSheet.create({
     flex: 1,
     margin: 6,
     maxWidth: "48%",
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: COLORS.white,
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: COLORS.lightGray,
+    textAlign: "center",
   },
 })

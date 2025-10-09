@@ -166,7 +166,7 @@ export interface MovieCardProps {
 export interface StatCardProps {
   title: string
   value: string | number
-  icon?: string
+  icon?: keyof typeof import("@expo/vector-icons").Ionicons["glyphMap"]
   color?: string
 }
 

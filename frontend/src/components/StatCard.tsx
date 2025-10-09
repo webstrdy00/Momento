@@ -14,7 +14,7 @@ export default function StatCard({ title, value, icon, color = COLORS.gold }: St
     <View style={styles.container}>
       {/* 아이콘 */}
       {icon && (
-        <Ionicons name={icon as any} size={32} color={color} />
+        <Ionicons name={icon} size={32} color={color} />
       )}
 
       {/* 값 */}
