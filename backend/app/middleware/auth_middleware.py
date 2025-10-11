@@ -105,6 +105,10 @@ async def fetch_supabase_jwks() -> Dict[str, Any]:
 security_optional = HTTPBearer(auto_error=False)
 
 
+# Alias for consistency (get_current_user_id is the same as get_current_user)
+get_current_user_id = get_current_user
+
+
 # Optional: Dependency for routes that allow optional authentication
 async def get_current_user_optional(
     credentials: HTTPAuthorizationCredentials = Security(security_optional),

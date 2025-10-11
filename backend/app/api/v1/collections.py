@@ -12,6 +12,7 @@ from app.schemas.collection import (
     CollectionCreate, CollectionUpdate, CollectionResponse, CollectionWithMovies
 )
 from app.schemas.common import BaseResponse
+from app.services.auto_collection_service import auto_collection_service
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
@@ -351,3 +352,80 @@ async def remove_movie_from_collection(
             "user_movie_id": user_movie_id
         }
     )
+
+
+@router.post("/{collection_id}/sync", response_model=BaseResponse[dict])
+async def sync_auto_collection(
+    collection_id: int,
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_current_user),
+):
+    """
+    자동 컬렉션 동기화
+
+    auto_rule에 정의된 규칙에 따라 영화를 자동으로 추가/제거
+
+    auto_rule 예시:
+    {
+        "status": "completed",
+        "rating": {"min": 4.0},
+        "year": {"min": 2020, "max": 2024},
+        "genre": "드라마",
+        "is_best_movie": true
+    }
+
+    Returns:
+    - added_count: 추가된 영화 수
+    - removed_count: 제거된 영화 수
+    - total_count: 최종 컬렉션의 영화 수
+    """
+    # Check collection belongs to user
+    collection = (
+        db.query(Collection)
+        .filter(Collection.id == collection_id, Collection.user_id == user_id)
+        .first()
+    )
+
+    if not collection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Collection not found",
+        )
+
+    # Check if auto collection
+    if not collection.is_auto:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This is not an auto collection",
+        )
+
+    # Check auto_rule exists
+    if not collection.auto_rule:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Auto rule is not defined for this collection",
+        )
+
+    try:
+        # Validate auto_rule
+        auto_collection_service.validate_auto_rule(collection.auto_rule)
+
+        # Sync collection
+        result = auto_collection_service.sync_auto_collection(collection_id, db)
+
+        return BaseResponse(
+            success=True,
+            message=f"컬렉션 동기화 완료: {result['added_count']}개 추가, {result['removed_count']}개 제거",
+            data=result
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"동기화 실패: {str(e)}"
+        )

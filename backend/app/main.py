@@ -54,8 +54,11 @@ async def health_check():
 
 
 # API 라우터 등록
-from app.api.v1 import movies, collections, stats
+from app.api.v1 import movies, collections, stats, users, tags, media
 
 app.include_router(movies.router, prefix="/api/v1")
 app.include_router(collections.router, prefix="/api/v1")
 app.include_router(stats.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(tags.router, prefix="/api/v1")
+app.include_router(media.router, prefix="/api/v1")

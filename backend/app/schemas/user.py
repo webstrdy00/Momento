@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr
 class UserBase(BaseModel):
     """User 기본 스키마"""
     email: EmailStr
-    username: Optional[str] = None
+    display_name: Optional[str] = None
     avatar_url: Optional[str] = None
 
 
@@ -21,7 +21,7 @@ class UserCreate(UserBase):
 
 class UserUpdate(BaseModel):
     """User 업데이트 스키마"""
-    username: Optional[str] = None
+    display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     yearly_goal: Optional[int] = None
 
