@@ -10,19 +10,17 @@ import MoviesScreen from "./src/screens/MoviesScreen"
 import StatsScreen from "./src/screens/StatsScreen"
 import ProfileScreen from "./src/screens/ProfileScreen"
 import MovieDetailScreen from "./src/screens/MovieDetailScreen"
+import MovieSearchScreen from "./src/screens/MovieSearchScreen"
+import CollectionDetailScreen from "./src/screens/CollectionDetailScreen"
+
+// Types
+import type { RootStackParamList, TabParamList } from "./src/types"
 
 // Colors
-const COLORS = {
-  darkNavy: "#1a1d29",
-  deepGray: "#2d2f3e",
-  gold: "#d4af37",
-  red: "#e74c3c",
-  white: "#ffffff",
-  lightGray: "#a0a0a0",
-}
+import { COLORS } from "./src/constants/colors"
 
-const Tab = createBottomTabNavigator()
-const Stack = createNativeStackNavigator()
+const Tab = createBottomTabNavigator<TabParamList>()
+const Stack = createNativeStackNavigator<RootStackParamList>()
 
 function TabNavigator() {
   return (
@@ -97,6 +95,21 @@ export default function App() {
       >
         <Stack.Screen name="Main" component={TabNavigator} options={{ headerShown: false }} />
         <Stack.Screen name="MovieDetail" component={MovieDetailScreen} options={{ title: "영화 상세" }} />
+        <Stack.Screen
+          name="MovieSearch"
+          component={MovieSearchScreen}
+          options={{
+            headerShown: false,
+            presentation: "modal",
+          }}
+        />
+        <Stack.Screen
+          name="CollectionDetail"
+          component={CollectionDetailScreen}
+          options={{
+            headerShown: false,
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   )

@@ -1,13 +1,19 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { LinearGradient } from "expo-linear-gradient"
 import { COLORS } from "../constants/colors"
+import MovieCard from "../components/MovieCard"
+import StatCard from "../components/StatCard"
+import type { RootStackParamList } from "../types"
 
 const { width } = Dimensions.get("window")
 
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
+
 export default function HomeScreen() {
-  const navigation = useNavigation()
+  const navigation = useNavigation<HomeScreenNavigationProp>()
 
   const currentMovie = {
     id: 1,
@@ -21,6 +27,21 @@ export default function HomeScreen() {
     { id: 2, title: "기생충", poster: "https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg" },
     { id: 3, title: "인터스텔라", poster: "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg" },
     { id: 4, title: "타이타닉", poster: "https://image.tmdb.org/t/p/w500/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg" },
+  ]
+
+  // 연간 목표 데이터
+  const yearlyGoal = {
+    target: 100,
+    current: 45,
+  }
+
+  const yearlyProgress = (yearlyGoal.current / yearlyGoal.target) * 100
+
+  // 인생 영화 데이터
+  const bestMovies = [
+    { id: 2, title: "기생충", poster: "https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg", rating: 5.0 },
+    { id: 3, title: "인터스텔라", poster: "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg", rating: 4.8 },
+    { id: 5, title: "쇼생크 탈출", poster: "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg", rating: 5.0 },
   ]
 
   return (
@@ -65,23 +86,68 @@ export default function HomeScreen() {
         </LinearGradient>
       </TouchableOpacity>
 
+      {/* Yearly Goal Card */}
+      <View style={styles.goalCard}>
+        <View style={styles.goalHeader}>
+          <Ionicons name="trophy-outline" size={24} color={COLORS.gold} />
+          <Text style={styles.goalTitle}>2025년 연간 목표</Text>
+        </View>
+        <View style={styles.goalContent}>
+          <Text style={styles.goalNumbers}>
+            <Text style={styles.goalCurrent}>{yearlyGoal.current}</Text>
+            <Text style={styles.goalSeparator}> / </Text>
+            <Text style={styles.goalTarget}>{yearlyGoal.target}편</Text>
+          </Text>
+          <View style={styles.goalProgressBar}>
+            <View style={[styles.goalProgressFill, { width: `${yearlyProgress}%` }]} />
+          </View>
+          <Text style={styles.goalPercentage}>{yearlyProgress.toFixed(0)}% 달성</Text>
+        </View>
+      </View>
+
       {/* Stats Section */}
       <View style={styles.statsSection}>
-        <View style={styles.statCard}>
-          <Ionicons name="calendar-outline" size={32} color={COLORS.gold} />
-          <Text style={styles.statValue}>22일째</Text>
-          <Text style={styles.statLabel}>연속 기록</Text>
+        <StatCard
+          title="연속 기록"
+          value="22일째"
+          icon="calendar-outline"
+          color={COLORS.gold}
+        />
+        <StatCard
+          title="이번 달"
+          value="12편"
+          icon="film-outline"
+          color={COLORS.gold}
+        />
+        <StatCard
+          title="평균 별점"
+          value="4.2"
+          icon="star-outline"
+          color={COLORS.gold}
+        />
+      </View>
+
+      {/* Best Movies Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitle}>인생 영화</Text>
+            <Ionicons name="star" size={20} color={COLORS.gold} style={{ marginLeft: 6 }} />
+          </View>
+          <TouchableOpacity>
+            <Text style={styles.seeAllText}>더 보기</Text>
+          </TouchableOpacity>
         </View>
-        <View style={styles.statCard}>
-          <Ionicons name="film-outline" size={32} color={COLORS.gold} />
-          <Text style={styles.statValue}>12편</Text>
-          <Text style={styles.statLabel}>이번 달</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Ionicons name="star-outline" size={32} color={COLORS.gold} />
-          <Text style={styles.statValue}>4.2</Text>
-          <Text style={styles.statLabel}>평균 별점</Text>
-        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.movieList}>
+          {bestMovies.map((movie) => (
+            <MovieCard
+              key={movie.id}
+              movie={{ ...movie, status: "completed" as const }}
+              onPress={() => navigation.navigate("MovieDetail", { id: movie.id })}
+              showRating={true}
+            />
+          ))}
+        </ScrollView>
       </View>
 
       {/* Watchlist Section */}
@@ -94,36 +160,25 @@ export default function HomeScreen() {
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.movieList}>
           {watchlistMovies.map((movie) => (
-            <TouchableOpacity
+            <MovieCard
               key={movie.id}
-              style={styles.movieCard}
+              movie={{ ...movie, status: "wishlist" as const }}
               onPress={() => navigation.navigate("MovieDetail", { id: movie.id })}
-            >
-              <Image source={{ uri: movie.poster }} style={styles.moviePoster} />
-              <Text style={styles.movieTitle} numberOfLines={2}>
-                {movie.title}
-              </Text>
-            </TouchableOpacity>
+            />
           ))}
         </ScrollView>
       </View>
 
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>빠른 액션</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.actionCard}>
-            <Ionicons name="add-circle-outline" size={32} color={COLORS.gold} />
-            <Text style={styles.actionText}>영화 추가</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionCard}>
-            <Ionicons name="search-outline" size={32} color={COLORS.gold} />
-            <Text style={styles.actionText}>영화 검색</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <View style={styles.bottomPadding} />
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.floatingButton}
+        onPress={() => navigation.navigate("MovieSearch")}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="add" size={28} color={COLORS.white} />
+      </TouchableOpacity>
     </ScrollView>
   )
 }
@@ -206,29 +261,65 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: COLORS.gold,
   },
+  goalCard: {
+    marginHorizontal: 20,
+    marginBottom: 24,
+    backgroundColor: COLORS.deepGray,
+    borderRadius: 16,
+    padding: 20,
+  },
+  goalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    gap: 8,
+  },
+  goalTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: COLORS.white,
+  },
+  goalContent: {
+    alignItems: "center",
+  },
+  goalNumbers: {
+    marginBottom: 12,
+  },
+  goalCurrent: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: COLORS.gold,
+  },
+  goalSeparator: {
+    fontSize: 20,
+    color: COLORS.lightGray,
+  },
+  goalTarget: {
+    fontSize: 20,
+    color: COLORS.lightGray,
+  },
+  goalProgressBar: {
+    width: "100%",
+    height: 8,
+    backgroundColor: COLORS.darkNavy,
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  goalProgressFill: {
+    height: "100%",
+    backgroundColor: COLORS.gold,
+  },
+  goalPercentage: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.gold,
+  },
   statsSection: {
     flexDirection: "row",
     paddingHorizontal: 20,
     marginBottom: 24,
     gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: COLORS.deepGray,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: COLORS.white,
-    marginTop: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.lightGray,
-    marginTop: 4,
   },
   section: {
     marginBottom: 24,
@@ -245,6 +336,10 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: COLORS.white,
   },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   seeAllText: {
     fontSize: 14,
     color: COLORS.gold,
@@ -253,39 +348,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 12,
   },
-  movieCard: {
-    width: 120,
-  },
-  moviePoster: {
-    width: 120,
-    height: 180,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  movieTitle: {
-    fontSize: 13,
-    color: COLORS.white,
-    fontWeight: "500",
-  },
-  quickActions: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  actionCard: {
-    flex: 1,
-    backgroundColor: COLORS.deepGray,
-    borderRadius: 12,
-    padding: 20,
-    alignItems: "center",
-  },
-  actionText: {
-    fontSize: 14,
-    color: COLORS.white,
-    marginTop: 8,
-    fontWeight: "500",
-  },
   bottomPadding: {
     height: 20,
+  },
+  floatingButton: {
+    position: "absolute",
+    right: 20,
+    bottom: 80, // Tab bar 위에
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.gold,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 5, // Android shadow
+    shadowColor: "#000", // iOS shadow
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
 })

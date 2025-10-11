@@ -1,12 +1,18 @@
 import { useState } from "react"
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, TextInput } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
+import type { NativeStackScreenProps } from "@react-navigation/native-stack"
 import { COLORS } from "../constants/colors"
+import type { RootStackParamList } from "../types"
 
-export default function MovieDetailScreen({ route }) {
+type MovieDetailScreenProps = NativeStackScreenProps<RootStackParamList, "MovieDetail">
+
+export default function MovieDetailScreen({ route }: MovieDetailScreenProps) {
   const [rating, setRating] = useState(4)
   const [review, setReview] = useState("")
+  const { id } = route.params // TypeScript now knows this is { id: number }
 
+  // TODO: Fetch movie data by id from API
   const movie = {
     title: "오펜하이머",
     originalTitle: "Oppenheimer",
