@@ -1,15 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
+from typing import List
 from app.database import get_db
 from app.middleware.auth_middleware import get_current_user
 from app.models.collection import Collection
 from app.models.collection_movie import CollectionMovie
+from app.models.user_movie import UserMovie
+from app.models.movie import Movie
+from app.schemas.collection import (
+    CollectionCreate, CollectionUpdate, CollectionResponse, CollectionWithMovies
+)
+from app.schemas.common import BaseResponse
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
 
-@router.get("/")
+@router.get("/", response_model=List[CollectionResponse])
 async def get_user_collections(
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
@@ -31,25 +38,24 @@ async def get_user_collections(
 
     result = []
     for collection, movie_count in collections:
-        collection_dict = {
-            "id": collection.id,
-            "name": collection.name,
-            "description": collection.description,
-            "is_auto": collection.is_auto,
-            "auto_rule": collection.auto_rule,
-            "movie_count": movie_count,
-            "created_at": collection.created_at,
-            "updated_at": collection.updated_at,
-        }
+        collection_dict = CollectionResponse(
+            id=collection.id,
+            name=collection.name,
+            description=collection.description,
+            type=collection.type,
+            cover_image_url=collection.cover_image_url,
+            auto_rules=collection.auto_rules,
+            user_id=collection.user_id,
+            movie_count=movie_count,
+            created_at=collection.created_at,
+            updated_at=collection.updated_at,
+        )
         result.append(collection_dict)
 
-    return {
-        "total": len(result),
-        "collections": result,
-    }
+    return result
 
 
-@router.get("/{collection_id}")
+@router.get("/{collection_id}", response_model=CollectionResponse)
 async def get_collection_detail(
     collection_id: int,
     db: Session = Depends(get_db),
@@ -58,47 +64,95 @@ async def get_collection_detail(
     """
     Get detailed information about a specific collection
     """
-    collection = (
-        db.query(Collection)
+    # Get collection with movie count
+    result = (
+        db.query(
+            Collection,
+            func.count(CollectionMovie.id).label("movie_count"),
+        )
+        .outerjoin(CollectionMovie, Collection.id == CollectionMovie.collection_id)
         .filter(Collection.id == collection_id, Collection.user_id == user_id)
+        .group_by(Collection.id)
         .first()
     )
 
-    if not collection:
+    if not result:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Collection not found",
         )
 
-    return collection
+    collection, movie_count = result
+
+    return CollectionResponse(
+        id=collection.id,
+        name=collection.name,
+        description=collection.description,
+        type=collection.type,
+        cover_image_url=collection.cover_image_url,
+        auto_rules=collection.auto_rules,
+        user_id=collection.user_id,
+        movie_count=movie_count,
+        created_at=collection.created_at,
+        updated_at=collection.updated_at,
+    )
 
 
-@router.post("/")
+@router.post("/", response_model=CollectionResponse, status_code=status.HTTP_201_CREATED)
 async def create_collection(
+    collection_data: CollectionCreate,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
     """
     Create a new collection
 
-    TODO: Implement with proper request body (Pydantic schema)
+    Request Body:
+    - name: Collection name (required)
+    - description: Collection description (optional)
+    - type: "manual" or "auto" (required)
+    - cover_image_url: Cover image URL (optional)
+    - auto_rules: Auto collection rules (JSONB, optional, only for type="auto")
     """
-    return {
-        "message": "Collection created successfully",
-        "user_id": user_id,
-    }
+    # Create collection
+    collection = Collection(
+        user_id=user_id,
+        **collection_data.model_dump()
+    )
+
+    db.add(collection)
+    db.commit()
+    db.refresh(collection)
+
+    return CollectionResponse(
+        id=collection.id,
+        name=collection.name,
+        description=collection.description,
+        type=collection.type,
+        cover_image_url=collection.cover_image_url,
+        auto_rules=collection.auto_rules,
+        user_id=collection.user_id,
+        movie_count=0,
+        created_at=collection.created_at,
+        updated_at=collection.updated_at,
+    )
 
 
-@router.put("/{collection_id}")
+@router.put("/{collection_id}", response_model=CollectionResponse)
 async def update_collection(
     collection_id: int,
+    update_data: CollectionUpdate,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
     """
     Update collection information
 
-    TODO: Implement with proper request body (Pydantic schema)
+    Request Body:
+    - name: Collection name (optional)
+    - description: Collection description (optional)
+    - cover_image_url: Cover image URL (optional)
+    - auto_rules: Auto collection rules (optional)
     """
     collection = (
         db.query(Collection)
@@ -112,13 +166,34 @@ async def update_collection(
             detail="Collection not found",
         )
 
-    return {
-        "message": "Collection updated successfully",
-        "collection_id": collection_id,
-    }
+    # Update only provided fields
+    update_dict = update_data.model_dump(exclude_unset=True)
+    for field, value in update_dict.items():
+        setattr(collection, field, value)
+
+    db.commit()
+    db.refresh(collection)
+
+    # Get movie count
+    movie_count = db.query(func.count(CollectionMovie.id)).filter(
+        CollectionMovie.collection_id == collection_id
+    ).scalar()
+
+    return CollectionResponse(
+        id=collection.id,
+        name=collection.name,
+        description=collection.description,
+        type=collection.type,
+        cover_image_url=collection.cover_image_url,
+        auto_rules=collection.auto_rules,
+        user_id=collection.user_id,
+        movie_count=movie_count,
+        created_at=collection.created_at,
+        updated_at=collection.updated_at,
+    )
 
 
-@router.delete("/{collection_id}")
+@router.delete("/{collection_id}", response_model=BaseResponse[dict])
 async def delete_collection(
     collection_id: int,
     db: Session = Depends(get_db),
@@ -142,42 +217,137 @@ async def delete_collection(
     db.delete(collection)
     db.commit()
 
-    return {"message": "Collection deleted successfully"}
+    return BaseResponse(
+        success=True,
+        message="Collection deleted successfully",
+        data={"collection_id": collection_id}
+    )
 
 
-@router.post("/{collection_id}/movies/{movie_id}")
+@router.post("/{collection_id}/movies/{user_movie_id}", response_model=BaseResponse[dict], status_code=status.HTTP_201_CREATED)
 async def add_movie_to_collection(
     collection_id: int,
-    movie_id: int,
+    user_movie_id: int,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
     """
     Add a movie to a collection
 
-    TODO: Implement full logic
+    Path Parameters:
+    - collection_id: Collection ID
+    - user_movie_id: UserMovie ID (not Movie ID!)
     """
-    return {
-        "message": "Movie added to collection",
-        "collection_id": collection_id,
-        "movie_id": movie_id,
-    }
+    # Check collection exists and belongs to user
+    collection = (
+        db.query(Collection)
+        .filter(Collection.id == collection_id, Collection.user_id == user_id)
+        .first()
+    )
+
+    if not collection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Collection not found",
+        )
+
+    # Check user_movie exists and belongs to user
+    user_movie = (
+        db.query(UserMovie)
+        .filter(UserMovie.id == user_movie_id, UserMovie.user_id == user_id)
+        .first()
+    )
+
+    if not user_movie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Movie not found in your library",
+        )
+
+    # Check if movie already in collection
+    existing = db.query(CollectionMovie).filter(
+        CollectionMovie.collection_id == collection_id,
+        CollectionMovie.user_movie_id == user_movie_id
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Movie already in this collection",
+        )
+
+    # Add movie to collection
+    collection_movie = CollectionMovie(
+        collection_id=collection_id,
+        user_movie_id=user_movie_id
+    )
+
+    db.add(collection_movie)
+    db.commit()
+
+    return BaseResponse(
+        success=True,
+        message="Movie added to collection successfully",
+        data={
+            "collection_id": collection_id,
+            "user_movie_id": user_movie_id
+        }
+    )
 
 
-@router.delete("/{collection_id}/movies/{movie_id}")
+@router.delete("/{collection_id}/movies/{user_movie_id}", response_model=BaseResponse[dict])
 async def remove_movie_from_collection(
     collection_id: int,
-    movie_id: int,
+    user_movie_id: int,
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
     """
     Remove a movie from a collection
 
-    TODO: Implement full logic
+    Path Parameters:
+    - collection_id: Collection ID
+    - user_movie_id: UserMovie ID (not Movie ID!)
     """
-    return {
-        "message": "Movie removed from collection",
-        "collection_id": collection_id,
-        "movie_id": movie_id,
-    }
+    # Check collection belongs to user
+    collection = (
+        db.query(Collection)
+        .filter(Collection.id == collection_id, Collection.user_id == user_id)
+        .first()
+    )
+
+    if not collection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Collection not found",
+        )
+
+    # Find collection_movie record
+    collection_movie = (
+        db.query(CollectionMovie)
+        .join(UserMovie, CollectionMovie.user_movie_id == UserMovie.id)
+        .filter(
+            CollectionMovie.collection_id == collection_id,
+            CollectionMovie.user_movie_id == user_movie_id,
+            UserMovie.user_id == user_id  # Verify user owns the movie
+        )
+        .first()
+    )
+
+    if not collection_movie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Movie not found in this collection",
+        )
+
+    db.delete(collection_movie)
+    db.commit()
+
+    return BaseResponse(
+        success=True,
+        message="Movie removed from collection successfully",
+        data={
+            "collection_id": collection_id,
+            "user_movie_id": user_movie_id
+        }
+    )

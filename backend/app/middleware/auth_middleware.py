@@ -2,8 +2,10 @@ from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import httpx
 import jwt
+import json
 from typing import Dict, Any
 from app.config import settings
+from app.services.redis_service import redis_service
 
 security = HTTPBearer()
 
@@ -68,25 +70,27 @@ async def fetch_supabase_jwks() -> Dict[str, Any]:
     """
     Fetch JWKS (JSON Web Key Set) from Supabase
 
-    In production, this should be cached in Redis for performance
+    Uses Redis caching for performance (1 hour cache)
 
     Returns:
         JWKS dictionary
     """
-    # TODO: Add Redis caching for JWKS (cache for 1 hour)
-    # Example:
-    # cached_jwks = await redis_client.get("supabase_jwks")
-    # if cached_jwks:
-    #     return json.loads(cached_jwks)
+    cache_key = "supabase_jwks"
 
+    # Try to get from cache
+    cached_jwks = await redis_service.get(cache_key)
+    if cached_jwks:
+        return json.loads(cached_jwks)
+
+    # Fetch from Supabase
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(settings.SUPABASE_JWKS_URL)
             response.raise_for_status()
             jwks = response.json()
 
-            # TODO: Cache in Redis
-            # await redis_client.setex("supabase_jwks", 3600, json.dumps(jwks))
+            # Cache for 1 hour (3600 seconds)
+            await redis_service.set(cache_key, json.dumps(jwks), ttl=3600)
 
             return jwks
 

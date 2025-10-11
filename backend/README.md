@@ -7,20 +7,26 @@ FastAPI 기반의 영화 기록 앱 백엔드 API
 **Hybrid Architecture: Supabase Auth + Independent PostgreSQL**
 
 ```
-[Mobile App]
-     ↓
-Supabase Auth SDK (이메일/구글/애플 로그인)
-     ↓
-JWT Token 발급
-     ↓
+[Mobile App (React Native/Expo)]
+         ↓
+Supabase Auth SDK
+  - 이메일 로그인
+  - 구글 로그인
+  - 애플 로그인
+  - 카카오 로그인
+         ↓
+    JWT Token 발급 (Supabase)
+         ↓
 [FastAPI Backend]
-  - Supabase JWT 검증 (JWKS)
+  - Supabase JWT 검증 (JWKS 기반)
   - 영화 CRUD (100% FastAPI 통제)
   - 통계/분석
-  - 외부 API 프록시
-     ↓
+  - 외부 API 프록시 (KOBIS/TMDb/KMDb)
+         ↓
 Independent PostgreSQL (Docker/RDS/Neon)
-     ↓
+  - 8개 테이블
+  - FastAPI 100% 통제
+         ↓
 S3 or Supabase Storage (이미지)
 ```
 
@@ -160,7 +166,65 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-### 6. API 문서 확인
+### 6. Supabase Auth 설정 (선택 - 실제 인증 테스트 시)
+
+#### Supabase 프로젝트 생성
+
+1. https://supabase.com 접속 및 로그인
+2. "New Project" 클릭
+3. 프로젝트 이름: `filmory` 입력
+4. Database Password 설정 (저장 필수)
+5. Region 선택: `Northeast Asia (Seoul)`
+6. "Create new project" 클릭
+
+#### Authentication Providers 설정
+
+**Settings → Authentication → Providers에서 활성화:**
+
+1. **Email** (기본 활성화)
+   - Email confirmation: 개발 중에는 비활성화 가능
+   - Secure email change: 활성화 권장
+
+2. **Google**
+   - Google Cloud Console에서 OAuth 2.0 Client ID 발급
+   - Authorized redirect URIs: `https://[YOUR-PROJECT].supabase.co/auth/v1/callback`
+   - Client ID와 Client Secret을 Supabase에 입력
+
+3. **Apple**
+   - Apple Developer에서 Sign in with Apple 설정
+   - Service ID 생성
+   - Key 생성 및 다운로드
+   - Supabase에 Service ID, Team ID, Key ID, Private Key 입력
+
+4. **Kakao**
+   - Kakao Developers에서 애플리케이션 생성
+   - REST API 키 발급
+   - Redirect URI 설정: `https://[YOUR-PROJECT].supabase.co/auth/v1/callback`
+   - Supabase에 Client ID와 Client Secret 입력
+
+#### API Keys 복사
+
+**Settings → API → Project API keys:**
+
+```bash
+# .env 파일에 추가
+SUPABASE_URL=https://[YOUR-PROJECT].supabase.co
+SUPABASE_ANON_KEY=eyJhbGc...  # anon/public key
+SUPABASE_JWKS_URL=https://[YOUR-PROJECT].supabase.co/.well-known/jwks.json
+```
+
+#### 인증 플로우 테스트
+
+```bash
+# 프론트엔드에서 Supabase Auth SDK 사용
+# 1. 사용자 로그인 (Email/Google/Apple/Kakao)
+# 2. JWT Token 발급 (Supabase)
+# 3. Token을 Authorization Header에 포함하여 API 호출
+# 4. FastAPI가 JWKS로 Token 검증
+# 5. user_id 추출 후 PostgreSQL 쿼리
+```
+
+### 7. API 문서 확인
 
 서버 실행 후 브라우저에서:
 

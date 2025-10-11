@@ -1,5 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+from app.services.redis_service import redis_service
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan events
+    """
+    # Startup
+    await redis_service.connect()
+    print("✅ Redis connected")
+    yield
+    # Shutdown
+    await redis_service.disconnect()
+    print("✅ Redis disconnected")
+
 
 app = FastAPI(
     title="Filmory API",
@@ -7,6 +24,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # CORS 설정
