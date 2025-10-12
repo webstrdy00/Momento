@@ -1,14 +1,33 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native"
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { COLORS } from "../constants/colors"
 import type { RootStackParamList } from "../types"
+import { useAuth } from "../contexts/AuthContext"
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
 
 export default function ProfileScreen() {
   const navigation = useNavigation<ProfileScreenNavigationProp>()
+  const { signOut } = useAuth()
+
+  const handleLogout = () => {
+    Alert.alert(
+      '로그아웃',
+      '정말 로그아웃 하시겠습니까?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '로그아웃',
+          style: 'destructive',
+          onPress: async () => {
+            await signOut()
+          },
+        },
+      ]
+    )
+  }
 
   // Mock 컬렉션 데이터
   const collections = [
@@ -110,7 +129,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton}>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Ionicons name="log-out-outline" size={20} color={COLORS.red} />
         <Text style={styles.logoutText}>로그아웃</Text>
       </TouchableOpacity>

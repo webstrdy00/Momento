@@ -44,7 +44,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const handleDeepLink = async (url: string) => {
       if (url.includes('#access_token=') || url.includes('?access_token=')) {
         console.log('🔗 Deep link received:', url);
-        // Supabase가 자동으로 처리하므로 추가 작업 불필요
+
+        // URL에서 토큰 추출
+        const params = new URLSearchParams(url.split('#')[1] || url.split('?')[1]);
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
+
+        if (access_token && refresh_token) {
+          // Supabase에 세션 설정
+          const { data, error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+
+          if (error) {
+            console.error('❌ 세션 설정 실패:', error.message);
+          } else {
+            console.log('✅ 세션 설정 성공:', data.user?.email);
+          }
+        }
       }
     };
 

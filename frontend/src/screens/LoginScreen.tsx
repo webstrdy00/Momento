@@ -109,7 +109,7 @@ const LoginScreen = ({ navigation }: any) => {
           <Text style={styles.loginButtonText}>Google로 계속하기</Text>
         </TouchableOpacity>
 
-        {/* Apple 로그인 */}
+        {/* Apple 로그인 - 개발자 계정 필요로 임시 비활성화
         <TouchableOpacity
           style={styles.loginButton}
           onPress={handleAppleLogin}
@@ -118,6 +118,7 @@ const LoginScreen = ({ navigation }: any) => {
           <Ionicons name="logo-apple" size={24} color={COLORS.gold} />
           <Text style={styles.loginButtonText}>Apple로 계속하기</Text>
         </TouchableOpacity>
+        */}
 
         {/* Kakao 로그인 */}
         <TouchableOpacity
