@@ -3,6 +3,13 @@ import { NavigationContainer } from "@react-navigation/native"
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs"
 import { createNativeStackNavigator } from "@react-navigation/native-stack"
 import { Ionicons } from "@expo/vector-icons"
+import { ActivityIndicator, View, StyleSheet } from "react-native"
+
+// Auth
+import { AuthProvider, useAuth } from "./src/contexts/AuthContext"
+import LoginScreen from "./src/screens/LoginScreen"
+import EmailLoginScreen from "./src/screens/EmailLoginScreen"
+import SignUpScreen from "./src/screens/SignUpScreen"
 
 // Screens
 import HomeScreen from "./src/screens/HomeScreen"
@@ -78,39 +85,86 @@ function TabNavigator() {
   )
 }
 
-export default function App() {
+// Auth Stack (로그인 전)
+function AuthStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
+      <Stack.Screen name="SignUp" component={SignUpScreen} />
+    </Stack.Navigator>
+  )
+}
+
+// Main Stack (로그인 후)
+function MainStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: COLORS.darkNavy,
+        },
+        headerTintColor: COLORS.white,
+        headerTitleStyle: {
+          fontWeight: "bold",
+        },
+      }}
+    >
+      <Stack.Screen name="Main" component={TabNavigator} options={{ headerShown: false }} />
+      <Stack.Screen name="MovieDetail" component={MovieDetailScreen} options={{ title: "영화 상세" }} />
+      <Stack.Screen
+        name="MovieSearch"
+        component={MovieSearchScreen}
+        options={{
+          headerShown: false,
+          presentation: "modal",
+        }}
+      />
+      <Stack.Screen
+        name="CollectionDetail"
+        component={CollectionDetailScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+    </Stack.Navigator>
+  )
+}
+
+// Root Navigator
+function RootNavigator() {
+  const { session, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.gold} />
+      </View>
+    )
+  }
+
   return (
     <NavigationContainer>
       <StatusBar style="light" />
-      <Stack.Navigator
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: COLORS.darkNavy,
-          },
-          headerTintColor: COLORS.white,
-          headerTitleStyle: {
-            fontWeight: "bold",
-          },
-        }}
-      >
-        <Stack.Screen name="Main" component={TabNavigator} options={{ headerShown: false }} />
-        <Stack.Screen name="MovieDetail" component={MovieDetailScreen} options={{ title: "영화 상세" }} />
-        <Stack.Screen
-          name="MovieSearch"
-          component={MovieSearchScreen}
-          options={{
-            headerShown: false,
-            presentation: "modal",
-          }}
-        />
-        <Stack.Screen
-          name="CollectionDetail"
-          component={CollectionDetailScreen}
-          options={{
-            headerShown: false,
-          }}
-        />
-      </Stack.Navigator>
+      {session ? <MainStack /> : <AuthStack />}
     </NavigationContainer>
   )
 }
+
+// App Component
+export default function App() {
+  return (
+    <AuthProvider>
+      <RootNavigator />
+    </AuthProvider>
+  )
+}
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: COLORS.darkNavy,
+  },
+})
