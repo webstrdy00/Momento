@@ -1,38 +1,71 @@
-import { View, Text, StyleSheet, ScrollView, Dimensions } from "react-native"
+import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from "react-native"
+import { useState, useEffect } from "react"
 import { COLORS } from "../constants/colors"
 import StatCard from "../components/StatCard"
+import { getOverallStats, getMonthlyStats, getGenreStats, getTagStats } from "../services/statsService"
 
 const { width } = Dimensions.get("window")
 
+const GENRE_COLORS = [COLORS.gold, COLORS.red, "#3498db", "#2ecc71", "#9b59b6", "#e67e22"]
+
 export default function StatsScreen() {
-  const yearlyGoal = 100
-  const watched = 45
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<any>(null)
+  const [monthlyData, setMonthlyData] = useState<any[]>([])
+  const [genreStats, setGenreStats] = useState<any[]>([])
+  const [topTags, setTopTags] = useState<any[]>([])
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [statsData, monthlyDataRes, genreDataRes, tagsDataRes] = await Promise.all([
+        getOverallStats(),
+        getMonthlyStats(6).catch(() => []),
+        getGenreStats(5).catch(() => []),
+        getTagStats(10).catch(() => []),
+      ])
+
+      setStats(statsData)
+
+      // 월별 데이터 포맷팅 (YYYY-MM → M월)
+      const formattedMonthly = monthlyDataRes.map((item: any) => ({
+        month: new Date(item.month + '-01').toLocaleDateString('ko-KR', { month: 'long' }),
+        count: item.count,
+      }))
+      setMonthlyData(formattedMonthly)
+
+      // 장르 데이터에 색상 추가
+      const formattedGenres = genreDataRes.map((item: any, index: number) => ({
+        ...item,
+        color: GENRE_COLORS[index % GENRE_COLORS.length],
+      }))
+      setGenreStats(formattedGenres)
+
+      setTopTags(tagsDataRes)
+    } catch (error) {
+      console.error('❌ StatsScreen 데이터 로드 실패:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading || !stats) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.gold} />
+        <Text style={{ color: COLORS.lightGray, marginTop: 12 }}>통계를 불러오는 중...</Text>
+      </View>
+    )
+  }
+
+  const yearlyGoal = stats.yearly_goal || 100
+  const watched = stats.yearly_progress || 0
   const progress = (watched / yearlyGoal) * 100
-
-  const monthlyData = [
-    { month: "1월", count: 5 },
-    { month: "2월", count: 8 },
-    { month: "3월", count: 6 },
-    { month: "4월", count: 12 },
-    { month: "5월", count: 9 },
-    { month: "6월", count: 5 },
-  ]
-
-  const genreStats = [
-    { genre: "드라마", count: 15, color: COLORS.gold },
-    { genre: "SF", count: 12, color: COLORS.red },
-    { genre: "액션", count: 10, color: "#3498db" },
-    { genre: "코미디", count: 8, color: "#2ecc71" },
-  ]
-
-  const topTags = [
-    { tag: "#명작", count: 18 },
-    { tag: "#재관람", count: 12 },
-    { tag: "#추천", count: 10 },
-    { tag: "#감동", count: 8 },
-  ]
-
-  const maxCount = Math.max(...monthlyData.map((d) => d.count))
+  const maxCount = monthlyData.length > 0 ? Math.max(...monthlyData.map((d) => d.count)) : 1
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -74,10 +107,10 @@ export default function StatsScreen() {
 
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
-        <StatCard title="총 관람" value="45편" icon="film" color={COLORS.gold} />
-        <StatCard title="평균 별점" value="4.2" icon="star" color={COLORS.gold} />
-        <StatCard title="총 시청 시간" value="120시간" icon="time" color={COLORS.gold} />
-        <StatCard title="연속 기록" value="22일" icon="calendar" color={COLORS.gold} />
+        <StatCard title="총 관람" value={`${stats.total_watched || 0}편`} icon="film" color={COLORS.gold} />
+        <StatCard title="평균 별점" value={(stats.average_rating || 0).toFixed(1)} icon="star" color={COLORS.gold} />
+        <StatCard title="총 시청 시간" value={`${Math.floor((stats.total_watch_time || 0) / 60)}시간`} icon="time" color={COLORS.gold} />
+        <StatCard title="연속 기록" value={`${stats.current_streak || 0}일`} icon="calendar" color={COLORS.gold} />
       </View>
 
       {/* Genre Stats */}

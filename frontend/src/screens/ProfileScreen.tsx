@@ -1,16 +1,52 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native"
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useNavigation } from "@react-navigation/native"
+import { useNavigation, useFocusEffect } from "@react-navigation/native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
+import { useState, useCallback } from "react"
 import { COLORS } from "../constants/colors"
 import type { RootStackParamList } from "../types"
 import { useAuth } from "../contexts/AuthContext"
+import { getCurrentUser } from "../services/userService"
+import { getOverallStats } from "../services/statsService"
+import { getCollections } from "../services/collectionService"
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
 
 export default function ProfileScreen() {
   const navigation = useNavigation<ProfileScreenNavigationProp>()
-  const { signOut } = useAuth()
+  const { signOut, user: authUser } = useAuth()
+
+  // State
+  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+  const [stats, setStats] = useState<any>(null)
+  const [collections, setCollections] = useState<any[]>([])
+
+  // Load data on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      loadData()
+    }, [])
+  )
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [userData, statsData, collectionsData] = await Promise.all([
+        getCurrentUser().catch(() => null),
+        getOverallStats().catch(() => null),
+        getCollections().catch(() => []),
+      ])
+
+      setUser(userData)
+      setStats(statsData)
+      setCollections(collectionsData)
+    } catch (error) {
+      console.error('❌ ProfileScreen 데이터 로드 실패:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleLogout = () => {
     Alert.alert(
@@ -29,12 +65,15 @@ export default function ProfileScreen() {
     )
   }
 
-  // Mock 컬렉션 데이터
-  const collections = [
-    { id: 1, name: "크리스토퍼 놀란 영화", movieCount: 5, isAuto: false },
-    { id: 2, name: "액션 명작", movieCount: 12, isAuto: false },
-    { id: 3, name: "2024년 본 영화", movieCount: 8, isAuto: true },
-  ]
+  // 로딩 중
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.gold} />
+        <Text style={{ color: COLORS.lightGray, marginTop: 12 }}>데이터를 불러오는 중...</Text>
+      </View>
+    )
+  }
 
   const menuItems = [
     { icon: "person-outline", label: "프로필 수정", action: "editProfile" },
@@ -54,22 +93,25 @@ export default function ProfileScreen() {
 
       {/* Profile Card */}
       <View style={styles.profileCard}>
-        <Image source={{ uri: "https://i.pravatar.cc/150?img=12" }} style={styles.avatar} />
-        <Text style={styles.userName}>영화 애호가</Text>
-        <Text style={styles.userEmail}>movie@lover.com</Text>
+        <Image
+          source={{ uri: user?.avatar_url || authUser?.user_metadata?.avatar_url || "https://i.pravatar.cc/150?img=12" }}
+          style={styles.avatar}
+        />
+        <Text style={styles.userName}>{user?.display_name || authUser?.user_metadata?.full_name || "영화 애호가"}</Text>
+        <Text style={styles.userEmail}>{user?.email || authUser?.email || "movie@lover.com"}</Text>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>45</Text>
+            <Text style={styles.statValue}>{stats?.total_watched || 0}</Text>
             <Text style={styles.statLabel}>관람</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>12</Text>
+            <Text style={styles.statValue}>{collections.length || 0}</Text>
             <Text style={styles.statLabel}>컬렉션</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>22</Text>
+            <Text style={styles.statValue}>{stats?.current_streak || 0}</Text>
             <Text style={styles.statLabel}>연속 기록</Text>
           </View>
         </View>
@@ -86,26 +128,35 @@ export default function ProfileScreen() {
 
         {/* Collection List */}
         <View style={styles.collectionList}>
-          {collections.map((collection) => (
-            <TouchableOpacity
-              key={collection.id}
-              style={styles.collectionItem}
-              onPress={() => navigation.navigate("CollectionDetail", { id: collection.id })}
-            >
-              <View style={styles.collectionLeft}>
-                <Ionicons
-                  name={collection.isAuto ? "sparkles" : "folder"}
-                  size={20}
-                  color={collection.isAuto ? COLORS.gold : COLORS.white}
-                />
-                <View style={styles.collectionInfo}>
-                  <Text style={styles.collectionName}>{collection.name}</Text>
-                  <Text style={styles.collectionCount}>{collection.movieCount}편</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={COLORS.lightGray} />
-            </TouchableOpacity>
-          ))}
+          {collections.length > 0 ? (
+            <>
+              {collections.map((collection) => (
+                <TouchableOpacity
+                  key={collection.id}
+                  style={styles.collectionItem}
+                  onPress={() => navigation.navigate("CollectionDetail", { id: collection.id })}
+                >
+                  <View style={styles.collectionLeft}>
+                    <Ionicons
+                      name={collection.is_auto ? "sparkles" : "folder"}
+                      size={20}
+                      color={collection.is_auto ? COLORS.gold : COLORS.white}
+                    />
+                    <View style={styles.collectionInfo}>
+                      <Text style={styles.collectionName}>{collection.name}</Text>
+                      <Text style={styles.collectionCount}>{collection.movie_count}편</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.lightGray} />
+                </TouchableOpacity>
+              ))}
+            </>
+          ) : (
+            <View style={styles.emptyCollections}>
+              <Ionicons name="folder-outline" size={40} color={COLORS.lightGray} />
+              <Text style={styles.emptyText}>아직 컬렉션이 없습니다</Text>
+            </View>
+          )}
 
           {/* Add New Collection Button */}
           <TouchableOpacity style={styles.addCollectionButton}>
@@ -313,5 +364,16 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 40,
+  },
+  emptyCollections: {
+    alignItems: "center",
+    padding: 40,
+    backgroundColor: COLORS.deepGray,
+    borderRadius: 12,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: COLORS.lightGray,
+    marginTop: 12,
   },
 })

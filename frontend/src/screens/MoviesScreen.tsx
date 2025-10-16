@@ -1,12 +1,13 @@
 import { useState, useMemo, useCallback, useEffect } from "react"
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, FlatList } from "react-native"
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, FlatList, ActivityIndicator } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { useNavigation } from "@react-navigation/native"
+import { useNavigation, useFocusEffect } from "@react-navigation/native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { COLORS } from "../constants/colors"
 import MovieCard from "../components/MovieCard"
 import FilterChip from "../components/FilterChip"
 import type { RootStackParamList, MovieStatus } from "../types"
+import { getMovies } from "../services/movieService"
 
 type MoviesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
 
@@ -15,6 +16,8 @@ export default function MoviesScreen() {
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
   const [selectedFilter, setSelectedFilter] = useState<"all" | MovieStatus>("all")
+  const [movies, setMovies] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   // Debounce search query (300ms delay)
   useEffect(() => {
@@ -25,50 +28,26 @@ export default function MoviesScreen() {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  const movies = [
-    {
-      id: 1,
-      title: "오펜하이머",
-      poster: "https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
-      rating: 4.5,
-      status: "watching",
-    },
-    {
-      id: 2,
-      title: "기생충",
-      poster: "https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg",
-      rating: 5,
-      status: "completed",
-    },
-    {
-      id: 3,
-      title: "인터스텔라",
-      poster: "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg",
-      rating: 4.8,
-      status: "completed",
-    },
-    {
-      id: 4,
-      title: "타이타닉",
-      poster: "https://image.tmdb.org/t/p/w500/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg",
-      rating: 4.2,
-      status: "watchlist",
-    },
-    {
-      id: 5,
-      title: "라라랜드",
-      poster: "https://image.tmdb.org/t/p/w500/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg",
-      rating: 4.6,
-      status: "completed",
-    },
-    {
-      id: 6,
-      title: "듄: 파트2",
-      poster: "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
-      rating: 0,
-      status: "watchlist",
-    },
-  ]
+  // Load movies on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      loadMovies()
+    }, [selectedFilter])
+  )
+
+  const loadMovies = async () => {
+    try {
+      setLoading(true)
+      const status = selectedFilter === "all" ? undefined : selectedFilter
+      const data = await getMovies(status)
+      setMovies(data)
+    } catch (error) {
+      console.error('❌ 영화 목록 로드 실패:', error)
+      setMovies([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filters = [
     { id: "all", label: "전체" },
@@ -143,23 +122,30 @@ export default function MoviesScreen() {
       </ScrollView>
 
       {/* Movies Grid */}
-      <FlatList
-        data={filteredMovies}
-        renderItem={renderMovieCard}
-        keyExtractor={(item) => item.id.toString()}
-        numColumns={2}
-        contentContainerStyle={styles.moviesGrid}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="film-outline" size={64} color={COLORS.lightGray} />
-            <Text style={styles.emptyTitle}>영화를 찾을 수 없습니다</Text>
-            <Text style={styles.emptySubtitle}>
-              {searchQuery ? "다른 검색어를 시도해보세요" : "필터를 변경해보세요"}
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.gold} />
+          <Text style={styles.loadingText}>영화 목록을 불러오는 중...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredMovies}
+          renderItem={renderMovieCard}
+          keyExtractor={(item) => item.id.toString()}
+          numColumns={2}
+          contentContainerStyle={styles.moviesGrid}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="film-outline" size={64} color={COLORS.lightGray} />
+              <Text style={styles.emptyTitle}>영화를 찾을 수 없습니다</Text>
+              <Text style={styles.emptySubtitle}>
+                {searchQuery ? "다른 검색어를 시도해보세요" : "영화를 추가해보세요"}
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   )
 }
@@ -231,5 +217,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.lightGray,
     textAlign: "center",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: COLORS.lightGray,
+    marginTop: 12,
   },
 })

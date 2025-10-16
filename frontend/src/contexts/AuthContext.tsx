@@ -2,6 +2,7 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import { supabase } from '../lib/supabase';
+import { createUser } from '../services/userService';
 
 interface AuthContextType {
   session: Session | null;
@@ -32,8 +33,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // 세션 변경 감지
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         console.log('🔄 Auth state changed:', _event);
+
+        // 로그인 성공 시 Backend에 사용자 자동 생성
+        if (_event === 'SIGNED_IN' && session?.user) {
+          try {
+            await createUser({
+              email: session.user.email!,
+              display_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name,
+              avatar_url: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
+            });
+            console.log('✅ Backend 사용자 생성 완료 또는 이미 존재함');
+          } catch (error: any) {
+            // 이미 존재하는 사용자는 무시 (409 Conflict)
+            if (error.response?.status !== 409) {
+              console.error('❌ Backend 사용자 생성 실패:', error);
+            }
+          }
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
