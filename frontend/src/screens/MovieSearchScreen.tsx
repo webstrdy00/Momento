@@ -1,134 +1,124 @@
-import { useState, useMemo } from "react"
-import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Image } from "react-native"
+import { useState, useEffect } from "react"
+import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Image, ActivityIndicator, Alert } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useNavigation } from "@react-navigation/native"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { COLORS } from "../constants/colors"
 import type { RootStackParamList } from "../types"
+import { searchMovies, addMovie } from "../services/movieService"
 
 type MovieSearchScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>
 
 export default function MovieSearchScreen() {
   const navigation = useNavigation<MovieSearchScreenNavigationProp>()
   const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+  const [addingMovieId, setAddingMovieId] = useState<number | null>(null)
 
-  // Mock movie search results
-  const allMovies = [
-    {
-      id: 1,
-      title: "오펜하이머",
-      originalTitle: "Oppenheimer",
-      year: 2023,
-      genre: "드라마, 역사",
-      director: "크리스토퍼 놀란",
-      poster: "https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
-    },
-    {
-      id: 2,
-      title: "기생충",
-      originalTitle: "Parasite",
-      year: 2019,
-      genre: "드라마, 스릴러",
-      director: "봉준호",
-      poster: "https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg",
-    },
-    {
-      id: 3,
-      title: "인터스텔라",
-      originalTitle: "Interstellar",
-      year: 2014,
-      genre: "SF, 드라마",
-      director: "크리스토퍼 놀란",
-      poster: "https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg",
-    },
-    {
-      id: 4,
-      title: "타이타닉",
-      originalTitle: "Titanic",
-      year: 1997,
-      genre: "로맨스, 드라마",
-      director: "제임스 카메론",
-      poster: "https://image.tmdb.org/t/p/w500/9xjZS2rlVxm8SFx8kPC3aIGCOYQ.jpg",
-    },
-    {
-      id: 5,
-      title: "라라랜드",
-      originalTitle: "La La Land",
-      year: 2016,
-      genre: "로맨스, 뮤지컬",
-      director: "데이미언 셔젤",
-      poster: "https://image.tmdb.org/t/p/w500/uDO8zWDhfWwoFdKS4fzkUJt0Rf0.jpg",
-    },
-    {
-      id: 6,
-      title: "듄: 파트2",
-      originalTitle: "Dune: Part Two",
-      year: 2024,
-      genre: "SF, 액션",
-      director: "드니 빌뇌브",
-      poster: "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
-    },
-    {
-      id: 7,
-      title: "어바웃 타임",
-      originalTitle: "About Time",
-      year: 2013,
-      genre: "로맨스, 드라마",
-      director: "리처드 커티스",
-      poster: "https://image.tmdb.org/t/p/w500/4eJeDeT5G3N3hT2pZ2hY6pAg6qW.jpg",
-    },
-    {
-      id: 8,
-      title: "인셉션",
-      originalTitle: "Inception",
-      year: 2010,
-      genre: "SF, 액션",
-      director: "크리스토퍼 놀란",
-      poster: "https://image.tmdb.org/t/p/w500/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg",
-    },
-  ]
-
-  // Filter movies based on search query
-  const searchResults = useMemo(() => {
+  // Debounced search
+  useEffect(() => {
     if (!searchQuery.trim()) {
-      return []
+      setSearchResults([])
+      return
     }
 
-    const query = searchQuery.toLowerCase().trim()
-    return allMovies.filter(
-      (movie) =>
-        movie.title.toLowerCase().includes(query) ||
-        movie.originalTitle.toLowerCase().includes(query) ||
-        movie.director.toLowerCase().includes(query)
-    )
+    const timer = setTimeout(() => {
+      performSearch(searchQuery)
+    }, 500)
+
+    return () => clearTimeout(timer)
   }, [searchQuery])
 
-  const renderMovieItem = ({ item }: { item: typeof allMovies[0] }) => (
-    <TouchableOpacity
-      style={styles.movieItem}
-      onPress={() => {
-        // TODO: Navigate to MovieDetail screen
-        navigation.navigate("MovieDetail", { id: item.id })
-      }}
-    >
-      <Image source={{ uri: item.poster }} style={styles.poster} />
-      <View style={styles.movieInfo}>
-        <Text style={styles.title} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.originalTitle} numberOfLines={1}>
-          {item.originalTitle}
-        </Text>
-        <View style={styles.metadata}>
-          <Text style={styles.metadataText}>
-            {item.year} · {item.genre}
+  const performSearch = async (query: string) => {
+    try {
+      setLoading(true)
+      const results = await searchMovies(query)
+      setSearchResults(results)
+    } catch (error) {
+      console.error('❌ 영화 검색 실패:', error)
+      setSearchResults([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAddMovie = async (movie: any) => {
+    try {
+      setAddingMovieId(movie.movie_id || movie.id)
+
+      await addMovie({
+        movie_id: movie.movie_id || movie.id,
+        title: movie.title,
+        original_title: movie.original_title,
+        director: movie.director,
+        year: movie.year,
+        runtime: movie.runtime,
+        genre: movie.genre,
+        poster_url: movie.poster_url,
+        backdrop_url: movie.backdrop_url,
+        synopsis: movie.synopsis,
+        status: 'watchlist',
+      })
+
+      Alert.alert('성공', '영화가 추가되었습니다.', [
+        {
+          text: '확인',
+          onPress: () => navigation.goBack(),
+        },
+      ])
+    } catch (error: any) {
+      console.error('❌ 영화 추가 실패:', error)
+      if (error.response?.status === 409) {
+        Alert.alert('알림', '이미 추가된 영화입니다.')
+      } else {
+        Alert.alert('오류', '영화 추가에 실패했습니다.')
+      }
+    } finally {
+      setAddingMovieId(null)
+    }
+  }
+
+  const renderMovieItem = ({ item }: { item: any }) => {
+    const isAdding = addingMovieId === (item.movie_id || item.id)
+
+    return (
+      <View style={styles.movieItem}>
+        <Image source={{ uri: item.poster_url }} style={styles.poster} />
+        <View style={styles.movieInfo}>
+          <Text style={styles.title} numberOfLines={1}>
+            {item.title}
           </Text>
-          <Text style={styles.metadataText}>{item.director}</Text>
+          {item.original_title && (
+            <Text style={styles.originalTitle} numberOfLines={1}>
+              {item.original_title}
+            </Text>
+          )}
+          <View style={styles.metadata}>
+            {item.year && item.genre && (
+              <Text style={styles.metadataText}>
+                {item.year} · {item.genre}
+              </Text>
+            )}
+            {item.director && (
+              <Text style={styles.metadataText}>{item.director}</Text>
+            )}
+          </View>
         </View>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => handleAddMovie(item)}
+          disabled={isAdding}
+        >
+          {isAdding ? (
+            <ActivityIndicator size="small" color={COLORS.gold} />
+          ) : (
+            <Ionicons name="add-circle" size={28} color={COLORS.gold} />
+          )}
+        </TouchableOpacity>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={COLORS.lightGray} />
-    </TouchableOpacity>
-  )
+    )
+  }
 
   return (
     <View style={styles.container}>
@@ -164,7 +154,15 @@ export default function MovieSearchScreen() {
         <View style={styles.emptyContainer}>
           <Ionicons name="search" size={64} color={COLORS.lightGray} />
           <Text style={styles.emptyTitle}>영화를 검색해보세요</Text>
-          <Text style={styles.emptySubtitle}>제목, 원제목, 감독으로 검색할 수 있습니다</Text>
+          <Text style={styles.emptySubtitle}>
+            제목, 원제목, 감독으로 검색할 수 있습니다{'\n'}
+            KOBIS, TMDb, KMDb에서 검색합니다
+          </Text>
+        </View>
+      ) : loading ? (
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color={COLORS.gold} />
+          <Text style={styles.loadingText}>검색 중...</Text>
         </View>
       ) : searchResults.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -176,7 +174,7 @@ export default function MovieSearchScreen() {
         <FlatList
           data={searchResults}
           renderItem={renderMovieItem}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => (item.movie_id || item.id).toString()}
           contentContainerStyle={styles.resultsList}
           showsVerticalScrollIndicator={false}
         />
@@ -278,5 +276,16 @@ const styles = StyleSheet.create({
   metadataText: {
     fontSize: 12,
     color: COLORS.lightGray,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  loadingText: {
+    fontSize: 14,
+    color: COLORS.lightGray,
+    marginTop: 12,
   },
 })

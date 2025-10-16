@@ -1,6 +1,7 @@
 /logs
 /docs
 /image
+/.serena
 
 .claude/
 CLAUDE.md
