@@ -9,7 +9,7 @@
     "userInterfaceStyle": "dark",
     "scheme": "cineentry",
     "splash": {
-      "image": "./assets/branding/cineentry-logo-splash.png",
+      "image": "./assets/branding/cineentry-symbol.png",
       "resizeMode": "contain",
       "backgroundColor": "#1a1d29"
     },
@@ -23,8 +23,8 @@
     "android": {
       "package": "com.cineentry.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/branding/cineentry-symbol.png",
-        "backgroundColor": "#E7E8E4"
+        "foregroundImage": "./assets/branding/cineentry-symbol-adaptive-foreground.png",
+        "backgroundColor": "#E8E8E4"
       },
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",

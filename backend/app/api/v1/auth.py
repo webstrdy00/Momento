@@ -164,28 +164,31 @@ def _render_mobile_oauth_bridge_page(
 
     if error:
         description = error_description or (
-            f"{provider_label} 로그인 완료를 처리하지 못했습니다. 앱으로 돌아가 다시 시도해주세요."
+            f"{provider_label} 계정 확인을 마무리하지 못했습니다. 앱으로 돌아가 다시 시도해주세요."
         )
-        return _render_status_page(
-            f"{provider_label} 로그인 실패",
+        return _render_handoff_status_page(
+            "로그인을 완료하지 못했습니다",
             description,
+            provider_label=provider_label,
             success=False,
             action_href=action_href,
             action_label="앱으로 돌아가기",
         )
 
     if not code or not state:
-        return _render_status_page(
-            f"{provider_label} 로그인 실패",
+        return _render_handoff_status_page(
+            "로그인 정보를 확인할 수 없습니다",
             "로그인 응답 값이 올바르지 않습니다. 앱에서 다시 시도해주세요.",
+            provider_label=provider_label,
             success=False,
             action_href=action_href,
             action_label="앱으로 돌아가기",
         )
 
-    return _render_status_page(
-        f"{provider_label} 로그인 연결 완료",
-        "앱으로 돌아가 로그인을 마무리하고 있습니다.",
+    return _render_handoff_status_page(
+        "앱으로 돌아갑니다",
+        f"{provider_label} 계정 확인이 끝났습니다. 앱에서 로그인을 이어서 처리합니다.",
+        provider_label=provider_label,
         success=True,
         action_href=action_href,
         action_label="앱으로 돌아가기",
@@ -335,20 +338,24 @@ def _render_auth_shell(page_title: str, content: str) -> HTMLResponse:
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <title>$page_title</title>
             <style>
+              @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap");
+
               :root {
                 color-scheme: dark;
-                --bg: #0b1120;
-                --bg-soft: #111827;
-                --card: rgba(15, 23, 42, 0.96);
-                --card-border: rgba(148, 163, 184, 0.16);
+                --bg: #05070b;
+                --bg-soft: #1a1d29;
+                --card: rgba(18, 21, 30, 0.94);
+                --card-border: rgba(255, 255, 255, 0.1);
                 --text: #f8fafc;
-                --muted: #94a3b8;
-                --line: rgba(148, 163, 184, 0.18);
+                --muted: rgba(240, 241, 245, 0.62);
+                --line: rgba(255, 255, 255, 0.12);
                 --accent: #d4af37;
-                --danger: #ef4444;
+                --danger: #e74c3c;
                 --success: #10b981;
-                --radius: 20px;
-                --shadow: 0 20px 48px rgba(0, 0, 0, 0.34);
+                --radius: 10px;
+                --shadow: 0 18px 36px rgba(0, 0, 0, 0.28);
+                --display: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
+                --body: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
               }
 
               * {
@@ -362,8 +369,8 @@ def _render_auth_shell(page_title: str, content: str) -> HTMLResponse:
               body {
                 margin: 0;
                 color: var(--text);
-                font-family: Inter, "Segoe UI", system-ui, sans-serif;
-                background: linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
+                font-family: var(--body);
+                background: linear-gradient(180deg, #05070b 0%, #101520 100%);
               }
 
               [hidden] {
@@ -375,7 +382,7 @@ def _render_auth_shell(page_title: str, content: str) -> HTMLResponse:
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                padding: 24px 16px;
+                padding: 24px 16px 28px;
               }
 
               .auth-card {
@@ -384,7 +391,9 @@ def _render_auth_shell(page_title: str, content: str) -> HTMLResponse:
                 border: 1px solid var(--card-border);
                 border-radius: var(--radius);
                 box-shadow: var(--shadow);
-                padding: 28px 22px;
+                padding: 28px 22px 24px;
+                position: relative;
+                overflow: hidden;
               }
 
               .brand-label {
@@ -397,9 +406,9 @@ def _render_auth_shell(page_title: str, content: str) -> HTMLResponse:
               }
 
               .status-icon {
-                width: 52px;
-                height: 52px;
-                border-radius: 14px;
+                width: 44px;
+                height: 44px;
+                border-radius: 8px;
                 display: grid;
                 place-items: center;
                 margin-bottom: 16px;
@@ -412,9 +421,15 @@ def _render_auth_shell(page_title: str, content: str) -> HTMLResponse:
                 color: #d1fae5;
               }
 
+              .status-icon.accent {
+                background: rgba(212, 175, 55, 0.12);
+                border-color: rgba(212, 175, 55, 0.24);
+                color: #f4d98a;
+              }
+
               .status-icon.failure {
-                background: rgba(239, 68, 68, 0.12);
-                border-color: rgba(239, 68, 68, 0.22);
+                background: rgba(231, 76, 60, 0.12);
+                border-color: rgba(231, 76, 60, 0.24);
                 color: #fecaca;
               }
 
@@ -425,8 +440,8 @@ def _render_auth_shell(page_title: str, content: str) -> HTMLResponse:
 
               .page-title {
                 margin: 0;
-                font-size: clamp(1.75rem, 4vw, 2.15rem);
-                line-height: 1.2;
+                font-size: clamp(1.75rem, 4vw, 2rem);
+                line-height: 1.14;
                 font-weight: 700;
               }
 
@@ -482,7 +497,8 @@ def _render_auth_shell(page_title: str, content: str) -> HTMLResponse:
               }
 
               .field-input:focus-visible,
-              .primary-button:focus-visible {
+              .primary-button:focus-visible,
+              .button-link:focus-visible {
                 outline: none;
                 border-color: rgba(212, 175, 55, 0.44);
                 box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.16);
@@ -606,6 +622,13 @@ def _render_auth_shell(page_title: str, content: str) -> HTMLResponse:
                 color: #111827;
                 text-decoration: none;
                 font-weight: 700;
+                cursor: pointer;
+                transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+                box-shadow: none;
+              }
+
+              .button-link:hover {
+                opacity: 0.94;
               }
 
               .message-box {
@@ -633,6 +656,147 @@ def _render_auth_shell(page_title: str, content: str) -> HTMLResponse:
                 color: var(--muted);
                 font-size: 14px;
                 line-height: 1.6;
+              }
+
+              .handoff-card {
+                width: min(100%, 500px);
+                padding: 28px 22px 22px;
+                background: linear-gradient(180deg, rgba(15, 18, 26, 0.98) 0%, rgba(23, 26, 36, 0.96) 100%);
+                border-color: rgba(255, 255, 255, 0.08);
+                box-shadow: 0 18px 42px rgba(0, 0, 0, 0.3);
+              }
+
+              .handoff-card::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 22px;
+                width: 72px;
+                height: 1px;
+                background: linear-gradient(90deg, rgba(212, 175, 55, 0.96), rgba(212, 175, 55, 0));
+              }
+
+              .handoff-brand {
+                margin: 0;
+                margin-bottom: 12px;
+              }
+
+              .handoff-meta {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                color: rgba(255, 255, 255, 0.58);
+                font-size: 12px;
+                font-weight: 500;
+                letter-spacing: 0;
+              }
+
+              .handoff-divider {
+                color: rgba(212, 175, 55, 0.7);
+              }
+
+              .handoff-hero {
+                margin-top: 14px;
+              }
+
+              .handoff-kicker {
+                display: none;
+              }
+
+              .handoff-title {
+                font-family: var(--display);
+                font-size: clamp(1.72rem, 6.4vw, 2.15rem);
+                font-weight: 700;
+                line-height: 1.08;
+                letter-spacing: -0.04em;
+                white-space: nowrap;
+              }
+
+              .handoff-copy {
+                margin-top: 12px;
+                max-width: none;
+                color: rgba(240, 241, 245, 0.74);
+                font-size: 14px;
+                line-height: 1.6;
+              }
+
+              .handoff-status {
+                margin: 18px 0 0;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                color: rgba(255, 255, 255, 0.82);
+                font-size: 13px;
+                font-weight: 500;
+                letter-spacing: 0;
+              }
+
+              .handoff-status::before {
+                content: "";
+                width: 8px;
+                height: 8px;
+                border-radius: 999px;
+                background: rgba(212, 175, 55, 0.92);
+                flex-shrink: 0;
+              }
+
+              .handoff-status.failure::before {
+                background: rgba(231, 76, 60, 0.92);
+              }
+
+              .handoff-caption {
+                margin: 8px 0 0;
+                color: rgba(240, 241, 245, 0.58);
+                font-size: 13px;
+                line-height: 1.6;
+              }
+
+              .handoff-actions {
+                margin-top: 20px;
+              }
+
+              .handoff-link {
+                width: 100%;
+                min-height: 48px;
+                padding: 0 16px;
+                border-radius: 8px;
+                border: 1px solid rgba(212, 175, 55, 0.44);
+                background: rgba(212, 175, 55, 0.12);
+                color: var(--text);
+                font-size: 14px;
+                font-weight: 600;
+                letter-spacing: -0.01em;
+              }
+
+              .handoff-link:hover {
+                border-color: rgba(212, 175, 55, 0.72);
+                background: rgba(212, 175, 55, 0.18);
+                opacity: 1;
+              }
+
+              .handoff-helper {
+                margin: 12px 0 0;
+                max-width: none;
+                font-size: 13px;
+              }
+
+              @media (max-width: 520px) {
+                .auth-shell {
+                  padding: 20px 14px;
+                }
+
+                .auth-card {
+                  padding: 24px 18px;
+                }
+
+                .handoff-card::before {
+                  left: 18px;
+                  width: 68px;
+                }
+
+                .handoff-title {
+                  font-size: clamp(1.56rem, 8vw, 1.9rem);
+                }
               }
 
               @media (prefers-reduced-motion: reduce) {
@@ -681,22 +845,7 @@ def _render_status_page(
         </svg>
         """
     )
-    action_button = ""
-    auto_open_script = ""
-    helper_note = "이 창은 닫아도 됩니다."
-    if action_href and action_label:
-        escaped_href = escape(action_href, quote=True)
-        action_button = f'<div class="action-row"><a class="button-link" href="{escaped_href}">{escape(action_label)}</a></div>'
-        helper_note = "앱이 자동으로 열리지 않으면 버튼을 눌러주세요."
-        if action_href.startswith("cineentry://"):
-            js_href = json.dumps(action_href, ensure_ascii=False)
-            auto_open_script = f"""
-            <script>
-              setTimeout(function () {{
-                window.location.href = {js_href};
-              }}, 250);
-            </script>
-            """
+    action_button, auto_open_script, helper_note = _build_status_action_markup(action_href, action_label)
 
     content = Template(
         """
@@ -717,6 +866,106 @@ def _render_status_page(
         seal_svg=seal_svg,
         title=escape(title),
         description=escape(description),
+        action_button=action_button,
+        helper_note=helper_note,
+        auto_open_script=auto_open_script,
+    )
+    return _render_auth_shell(title, content)
+
+
+def _build_status_action_markup(
+    action_href: str | None,
+    action_label: str | None,
+) -> tuple[str, str, str]:
+    action_button = ""
+    auto_open_script = ""
+    helper_note = "이 창은 닫아도 됩니다."
+    if action_href and action_label:
+        escaped_href = escape(action_href, quote=True)
+        action_button = f'<div class="action-row"><a class="button-link" href="{escaped_href}">{escape(action_label)}</a></div>'
+        helper_note = "앱이 자동으로 열리지 않으면 버튼을 눌러주세요."
+        if action_href.startswith("cineentry://"):
+            js_href = json.dumps(action_href, ensure_ascii=False)
+            auto_open_script = f"""
+            <script>
+              setTimeout(function () {{
+                window.location.href = {js_href};
+              }}, 250);
+            </script>
+            """
+    return action_button, auto_open_script, helper_note
+
+
+def _render_handoff_status_page(
+    title: str,
+    description: str,
+    *,
+    provider_label: str,
+    success: bool,
+    action_href: str | None = None,
+    action_label: str | None = None,
+) -> HTMLResponse:
+    accent_svg = (
+        """
+        <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <circle cx="15.5" cy="24" r="4.5" fill="currentColor" opacity="0.28" />
+          <path d="M14 24H31" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" />
+          <path d="M24 17L31 24L24 31" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        """
+        if success
+        else """
+        <svg viewBox="0 0 48 48" fill="none" aria-hidden="true">
+          <circle cx="24" cy="24" r="17" stroke="currentColor" stroke-width="2.4" opacity="0.34" />
+          <path d="M24 14V25" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" />
+          <circle cx="24" cy="31.5" r="1.9" fill="currentColor" />
+        </svg>
+        """
+    )
+    action_button, auto_open_script, helper_note = _build_status_action_markup(action_href, action_label)
+    if action_button:
+        action_button = action_button.replace('class="action-row"', 'class="action-row handoff-actions"')
+        action_button = action_button.replace('class="button-link"', 'class="button-link handoff-link"')
+
+    content = Template(
+        """
+        <section class="auth-card handoff-card">
+          <p class="brand-label handoff-brand">CineEntry</p>
+          <div class="handoff-meta">
+            <span>$provider_label 로그인</span>
+            <span class="handoff-divider" aria-hidden="true">/</span>
+            <span>앱 복귀</span>
+          </div>
+          <div class="handoff-hero">
+            <p class="handoff-kicker">$kicker</p>
+            <h1 class="page-title handoff-title">$title</h1>
+            <p class="page-copy handoff-copy">$description</p>
+          </div>
+          <p class="handoff-status $progress_class">$status</p>
+          <p class="handoff-caption">$caption</p>
+          $action_button
+          <p class="helper-note handoff-helper">$helper_note</p>
+          $auto_open_script
+        </section>
+        """
+    ).substitute(
+        provider_label=escape(provider_label),
+        icon_class="accent" if success else "failure",
+        accent_svg=accent_svg,
+        kicker=escape(
+            "로그인 연결" if success else "연결 중단"
+        ),
+        title=escape(title),
+        description=escape(description),
+        progress_class="" if success else "failure",
+        status=escape(
+            "자동으로 앱을 열고 있습니다." if success else "앱 복귀 링크를 준비했습니다."
+        ),
+        caption=escape(
+            "자동으로 열리지 않으면 아래 링크를 사용하세요."
+            if success
+            else "앱으로 돌아간 뒤 같은 로그인 수단으로 다시 시도할 수 있습니다."
+        ),
         action_button=action_button,
         helper_note=helper_note,
         auto_open_script=auto_open_script,

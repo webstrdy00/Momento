@@ -41,3 +41,6 @@ def test_render_mobile_oauth_bridge_page_contains_app_callback_url() -> None:
 
     assert "cineentry://auth/kakao/callback?code=sample-code&state=sample-state" in body
     assert "앱으로 돌아가기" in body
+    assert "앱으로 돌아갑니다" in body
+    assert "Kakao" in body
+    assert "앱 복귀" in body
