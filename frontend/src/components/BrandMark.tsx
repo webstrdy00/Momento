@@ -1,14 +1,11 @@
 import React from "react"
 import { Image, Platform, StyleSheet, Text, View } from "react-native"
 
+import { BRAND_LOCKUP_RATIO } from "../constants/branding"
 import { COLORS } from "../constants/colors"
 
 const PLAQUE_LOCKUP = require("../../assets/branding/cineentry-logo-lockup.png")
-const PLAQUE_LOCKUP_SOURCE = Image.resolveAssetSource(PLAQUE_LOCKUP)
-const PLAQUE_LOCKUP_RATIO = PLAQUE_LOCKUP_SOURCE.width / PLAQUE_LOCKUP_SOURCE.height
 const IMMERSIVE_LOCKUP = require("../../assets/branding/cineentry-logo-loading.png")
-const IMMERSIVE_LOCKUP_SOURCE = Image.resolveAssetSource(IMMERSIVE_LOCKUP)
-const IMMERSIVE_LOCKUP_RATIO = IMMERSIVE_LOCKUP_SOURCE.width / IMMERSIVE_LOCKUP_SOURCE.height
 
 type BrandMarkVariant = "plaque" | "immersive"
 
@@ -32,8 +29,8 @@ export default function BrandMark({
         } as const)
       : undefined
   const radius = Math.max(16, Math.round(width * 0.08))
+  const height = width / BRAND_LOCKUP_RATIO
   const source = isImmersive ? IMMERSIVE_LOCKUP : PLAQUE_LOCKUP
-  const ratio = isImmersive ? IMMERSIVE_LOCKUP_RATIO : PLAQUE_LOCKUP_RATIO
 
   return (
     <View style={styles.container}>
@@ -43,7 +40,7 @@ export default function BrandMark({
           isImmersive ? styles.logoImmersive : styles.logoPlaque,
           {
             width,
-            aspectRatio: ratio,
+            height,
             borderRadius: isImmersive ? 0 : radius,
           },
         ]}

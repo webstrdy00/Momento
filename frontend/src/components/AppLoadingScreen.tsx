@@ -13,14 +13,13 @@ import {
 import { LinearGradient } from "expo-linear-gradient"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { BRAND_LOCKUP_RATIO } from "../constants/branding"
 import { COLORS } from "../constants/colors"
 
 const TRACK_MIN_WIDTH = 220
 const TRACK_MAX_WIDTH = 280
 const SWEEP_WIDTH = 76
 const LOADING_LOGO = require("../../assets/branding/cineentry-logo-loading.png")
-const LOADING_LOGO_SOURCE = Image.resolveAssetSource(LOADING_LOGO)
-const LOADING_LOGO_RATIO = LOADING_LOGO_SOURCE.width / LOADING_LOGO_SOURCE.height
 
 export default function AppLoadingScreen() {
   const insets = useSafeAreaInsets()
@@ -48,7 +47,7 @@ export default function AppLoadingScreen() {
     () => Math.max(176, Math.min(width * (compactLayout ? 0.48 : 0.5), height * 0.22, 208)),
     [compactLayout, height, width]
   )
-  const logoHeight = useMemo(() => logoWidth / LOADING_LOGO_RATIO, [logoWidth])
+  const logoHeight = useMemo(() => logoWidth / BRAND_LOCKUP_RATIO, [logoWidth])
   const brandGap = compactLayout ? 18 : 24
   const subtitleGap = compactLayout ? 20 : 28
   const footerPaddingBottom = compactLayout ? 2 : 6
