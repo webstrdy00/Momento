@@ -39,6 +39,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const handledAuthUrlsRef = useRef<Map<string, Promise<void>>>(new Map());
 
+  const shouldCleanupWebAuthUrl = (url: string) => {
+    return (
+      url.includes('code=') ||
+      url.includes('error=') ||
+      url.includes('/auth/email/verified') ||
+      url.includes('/auth/password-reset-complete')
+    );
+  };
+
+  const cleanupWebAuthUrl = () => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return;
+    }
+
+    window.history.replaceState({}, document.title, '/');
+  };
+
   const handleAuthRedirectUrl = async (url: string) => {
     const normalizedUrl = url.trim();
 
@@ -52,8 +69,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
 
     const handlerPromise = (async () => {
-      console.log('🔗 Deep link received:', normalizedUrl);
-
       const urlParts = normalizedUrl.split('?');
       const params = new URLSearchParams(urlParts[1] || '');
       const error = params.get('error');
@@ -184,13 +199,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.location !== 'undefined') {
       const url = window.location.href;
       if (url.includes('/auth/')) {
-        handleAuthRedirectUrl(url)
-          .then(() => {
-            if (url.includes('code=') || url.includes('/auth/email/verified') || url.includes('/auth/password-reset-complete')) {
-              window.history.replaceState({}, document.title, '/');
-            }
-          })
-          .catch(() => {});
+        if (shouldCleanupWebAuthUrl(url)) {
+          cleanupWebAuthUrl();
+        }
+
+        handleAuthRedirectUrl(url).catch(() => {
+          if (shouldCleanupWebAuthUrl(url)) {
+            cleanupWebAuthUrl();
+          }
+        });
       }
     }
 

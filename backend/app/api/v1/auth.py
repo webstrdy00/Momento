@@ -2,6 +2,8 @@
 Authentication API endpoints
 이메일/OAuth 로그인, 회원가입, 이메일 인증, 비밀번호 재설정, 토큰 갱신
 """
+import base64
+import hashlib
 import json
 import secrets
 from html import escape
@@ -50,7 +52,7 @@ from app.services.response_serializers import serialize_auth_user
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # OAuth state 임시 저장 (프로덕션에서는 Redis 사용 권장)
-_oauth_states: dict[str, tuple[str, str]] = {}
+_oauth_states: dict[str, dict[str, str | None]] = {}
 
 
 def _normalize_oauth_client(client: str | None) -> str:
@@ -63,11 +65,28 @@ def _normalize_oauth_client(client: str | None) -> str:
     return normalized
 
 
-def _store_oauth_state(state: str, provider: str, client: str) -> None:
-    _oauth_states[state] = (provider, client)
+def _build_pkce_pair() -> tuple[str, str]:
+    verifier = secrets.token_urlsafe(64)
+    digest = hashlib.sha256(verifier.encode("utf-8")).digest()
+    challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+    return verifier, challenge
 
 
-def _consume_oauth_state(state: str | None, provider: str) -> str:
+def _store_oauth_state(
+    state: str,
+    provider: str,
+    client: str,
+    *,
+    code_verifier: str | None = None,
+) -> None:
+    _oauth_states[state] = {
+        "provider": provider,
+        "client": client,
+        "code_verifier": code_verifier,
+    }
+
+
+def _consume_oauth_state(state: str | None, provider: str) -> tuple[str, str | None]:
     """
     OAuth state 1회용 검증/소비.
 
@@ -89,14 +108,15 @@ def _consume_oauth_state(state: str | None, provider: str) -> str:
             detail="유효하지 않은 state입니다.",
         )
 
-    saved_provider, saved_client = saved_state
+    saved_provider = saved_state["provider"]
+    saved_client = saved_state["client"]
     if saved_provider != provider:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="유효하지 않은 state입니다.",
         )
 
-    return saved_client
+    return saved_client, saved_state.get("code_verifier")
 
 
 def _provider_label(provider: str) -> str:
@@ -1858,7 +1878,13 @@ async def google_auth_start(client: str = Query("web")):
 
     oauth_client = _normalize_oauth_client(client)
     state = secrets.token_urlsafe(32)
-    _store_oauth_state(state, "google", oauth_client)
+    code_verifier, code_challenge = _build_pkce_pair()
+    _store_oauth_state(
+        state,
+        "google",
+        oauth_client,
+        code_verifier=code_verifier,
+    )
     redirect_uri = _get_oauth_redirect_uri("google", oauth_client)
 
     params = {
@@ -1869,6 +1895,8 @@ async def google_auth_start(client: str = Query("web")):
         "state": state,
         "access_type": "offline",
         "prompt": "consent",
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
     }
 
     url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
@@ -1901,7 +1929,12 @@ async def google_auth_callback(
     request: OAuthCallbackRequest,
     db: Session = Depends(get_db),
 ):
-    oauth_client = _consume_oauth_state(request.state, "google")
+    oauth_client, code_verifier = _consume_oauth_state(request.state, "google")
+    if not code_verifier:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google PKCE 검증 정보가 유효하지 않습니다.",
+        )
     redirect_uri = _get_oauth_redirect_uri("google", oauth_client)
 
     async with httpx.AsyncClient() as client:
@@ -1913,6 +1946,7 @@ async def google_auth_callback(
                 "code": request.code,
                 "grant_type": "authorization_code",
                 "redirect_uri": redirect_uri,
+                "code_verifier": code_verifier,
             },
         )
 
@@ -2043,7 +2077,7 @@ async def kakao_auth_callback(
     request: OAuthCallbackRequest,
     db: Session = Depends(get_db),
 ):
-    oauth_client = _consume_oauth_state(request.state, "kakao")
+    oauth_client, _ = _consume_oauth_state(request.state, "kakao")
     redirect_uri = _get_oauth_redirect_uri("kakao", oauth_client)
 
     async with httpx.AsyncClient() as client:

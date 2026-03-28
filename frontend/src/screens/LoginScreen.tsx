@@ -48,8 +48,6 @@ const LoginScreen = ({ navigation }: any) => {
 
       const { url } = await getGoogleAuthUrl(Platform.OS === 'web' ? 'web' : 'mobile');
 
-      console.log('🔗 Google 로그인 시작:', url);
-
       if (Platform.OS === 'web') {
         window.location.href = url;
       } else {
@@ -60,7 +58,6 @@ const LoginScreen = ({ navigation }: any) => {
 
         if (result.type === 'success' && result.url) {
           await handleAuthRedirectUrl(result.url);
-          console.log('🔗 Google OAuth 콜백 URL:', result.url);
         }
       }
     } catch (error: any) {
@@ -78,8 +75,6 @@ const LoginScreen = ({ navigation }: any) => {
 
       const { url } = await getKakaoAuthUrl(Platform.OS === 'web' ? 'web' : 'mobile');
 
-      console.log('🔗 Kakao 로그인 시작:', url);
-
       if (Platform.OS === 'web') {
         window.location.href = url;
       } else {
@@ -90,7 +85,6 @@ const LoginScreen = ({ navigation }: any) => {
 
         if (result.type === 'success' && result.url) {
           await handleAuthRedirectUrl(result.url);
-          console.log('🔗 Kakao OAuth 콜백 URL:', result.url);
         }
       }
     } catch (error: any) {
