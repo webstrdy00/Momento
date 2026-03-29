@@ -31,13 +31,13 @@ const LoginScreen = ({ navigation }: any) => {
   const { width, height } = useWindowDimensions();
   const compactLayout = height < 760;
   const logoWidth = Math.max(
-    226,
-    Math.min(width * (compactLayout ? 0.74 : 0.8), height * 0.48, 320)
+    152,
+    Math.min(width * (compactLayout ? 0.44 : 0.46), height * 0.2, 186)
   );
   const contentMinHeight = Math.max(height - insets.top - insets.bottom, 0);
-  const topPadding = compactLayout ? 20 : 32;
+  const topPadding = compactLayout ? 18 : 26;
   const bottomPadding = Math.max(insets.bottom + (compactLayout ? 20 : 28), 28);
-  const headerMarginBottom = compactLayout ? 36 : 60;
+  const headerMarginBottom = compactLayout ? 28 : 40;
   const footerMarginTop = compactLayout ? 22 : 30;
   const termsMarginTop = compactLayout ? 20 : 30;
 
@@ -47,8 +47,6 @@ const LoginScreen = ({ navigation }: any) => {
       setLoadingProvider('google');
 
       const { url } = await getGoogleAuthUrl(Platform.OS === 'web' ? 'web' : 'mobile');
-
-      console.log('🔗 Google 로그인 시작:', url);
 
       if (Platform.OS === 'web') {
         window.location.href = url;
@@ -60,7 +58,6 @@ const LoginScreen = ({ navigation }: any) => {
 
         if (result.type === 'success' && result.url) {
           await handleAuthRedirectUrl(result.url);
-          console.log('🔗 Google OAuth 콜백 URL:', result.url);
         }
       }
     } catch (error: any) {
@@ -78,8 +75,6 @@ const LoginScreen = ({ navigation }: any) => {
 
       const { url } = await getKakaoAuthUrl(Platform.OS === 'web' ? 'web' : 'mobile');
 
-      console.log('🔗 Kakao 로그인 시작:', url);
-
       if (Platform.OS === 'web') {
         window.location.href = url;
       } else {
@@ -90,7 +85,6 @@ const LoginScreen = ({ navigation }: any) => {
 
         if (result.type === 'success' && result.url) {
           await handleAuthRedirectUrl(result.url);
-          console.log('🔗 Kakao OAuth 콜백 URL:', result.url);
         }
       }
     } catch (error: any) {
@@ -117,7 +111,11 @@ const LoginScreen = ({ navigation }: any) => {
       >
         {/* 헤더 */}
         <View style={[styles.header, { marginBottom: headerMarginBottom }]}>
-          <BrandMark width={logoWidth} subtitle="영화를 취향으로 남기는 기록장" />
+          <BrandMark
+            width={logoWidth}
+            subtitle="영화를 취향으로 남기는 기록장"
+            variant="immersive"
+          />
         </View>
 
         {/* 로그인 버튼들 */}
