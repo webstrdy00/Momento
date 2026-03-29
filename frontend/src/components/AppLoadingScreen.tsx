@@ -3,6 +3,7 @@ import {
   AccessibilityInfo,
   Animated,
   Easing,
+  Image,
   Platform,
   StyleSheet,
   Text,
@@ -12,22 +13,29 @@ import {
 import { LinearGradient } from "expo-linear-gradient"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
+import { BRAND_LOCKUP_RATIO } from "../constants/branding"
 import { COLORS } from "../constants/colors"
-import BrandMark from "./BrandMark"
 
 const TRACK_MIN_WIDTH = 220
 const TRACK_MAX_WIDTH = 280
 const SWEEP_WIDTH = 76
+const LOADING_LOGO = require("../../assets/branding/cineentry-logo-loading.png")
 
 export default function AppLoadingScreen() {
   const insets = useSafeAreaInsets()
   const { width, height } = useWindowDimensions()
   const [reduceMotion, setReduceMotion] = useState(false)
   const compactLayout = height < 760
+  const androidSharpImageProps =
+    Platform.OS === "android"
+      ? ({
+          resizeMethod: "resize",
+          resizeMultiplier: 2,
+        } as const)
+      : undefined
 
   const iconOpacity = useRef(new Animated.Value(0.78)).current
   const iconScale = useRef(new Animated.Value(1)).current
-  const haloOpacity = useRef(new Animated.Value(0.16)).current
   const progressTranslateX = useRef(new Animated.Value(-SWEEP_WIDTH)).current
 
   const contentWidth = useMemo(() => Math.min(width - 40, 360), [width])
@@ -36,12 +44,14 @@ export default function AppLoadingScreen() {
     [width]
   )
   const logoWidth = useMemo(
-    () => Math.max(210, Math.min(width * (compactLayout ? 0.66 : 0.74), height * 0.44, 304)),
+    () => Math.max(176, Math.min(width * (compactLayout ? 0.48 : 0.5), height * 0.22, 208)),
     [compactLayout, height, width]
   )
+  const logoHeight = useMemo(() => logoWidth / BRAND_LOCKUP_RATIO, [logoWidth])
   const brandGap = compactLayout ? 18 : 24
   const subtitleGap = compactLayout ? 20 : 28
   const footerPaddingBottom = compactLayout ? 2 : 6
+  const mainAreaPaddingBottom = compactLayout ? 30 : 44
   const subtitleFontSize = compactLayout ? 15 : 16
   const subtitleLineHeight = compactLayout ? 22 : 24
   const helperFontSize = compactLayout ? 12 : 13
@@ -75,7 +85,6 @@ export default function AppLoadingScreen() {
     if (reduceMotion) {
       iconOpacity.setValue(1)
       iconScale.setValue(1)
-      haloOpacity.setValue(0.22)
       progressTranslateX.setValue(trackWidth * 0.38)
       return
     }
@@ -112,20 +121,6 @@ export default function AppLoadingScreen() {
             useNativeDriver,
           }),
         ]),
-        Animated.sequence([
-          Animated.timing(haloOpacity, {
-            toValue: 0.26,
-            duration: 1800,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver,
-          }),
-          Animated.timing(haloOpacity, {
-            toValue: 0.16,
-            duration: 1800,
-            easing: Easing.inOut(Easing.ease),
-            useNativeDriver,
-          }),
-        ]),
       ])
     )
 
@@ -153,7 +148,7 @@ export default function AppLoadingScreen() {
       iconLoop.stop()
       progressLoop.stop()
     }
-  }, [haloOpacity, iconOpacity, iconScale, progressTranslateX, reduceMotion, trackWidth])
+  }, [iconOpacity, iconScale, progressTranslateX, reduceMotion, trackWidth])
 
   return (
     <View style={styles.container}>
@@ -164,16 +159,6 @@ export default function AppLoadingScreen() {
         style={StyleSheet.absoluteFill}
       />
       <View style={styles.textureOverlay} pointerEvents="none" />
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.halo,
-          {
-            opacity: haloOpacity,
-            top: insets.top + 76,
-          },
-        ]}
-      />
       <View pointerEvents="none" style={styles.edgeVignette} />
 
       <View
@@ -185,57 +170,70 @@ export default function AppLoadingScreen() {
           },
         ]}
       >
-        <View style={styles.spacer} />
-
-        <View style={[styles.centerBlock, { maxWidth: contentWidth }]}>
-          <Animated.View
-            style={[
-              styles.brandWrap,
-              {
-                marginBottom: brandGap,
-                opacity: iconOpacity,
-                transform: [{ scale: iconScale }],
-              },
-            ]}
-          >
-            <BrandMark width={logoWidth} />
-          </Animated.View>
-
-          <Text
-            style={[
-              styles.subtitle,
-              {
-                fontSize: subtitleFontSize,
-                lineHeight: subtitleLineHeight,
-                marginBottom: subtitleGap,
-              },
-            ]}
-          >
-            당신의 기록장을 준비하고 있어요
-          </Text>
-
-          <View style={[styles.progressTrack, { width: trackWidth }]}>
+        <View style={[styles.mainArea, { paddingBottom: mainAreaPaddingBottom }]}>
+          <View style={[styles.centerBlock, { maxWidth: contentWidth }]}>
             <Animated.View
               style={[
-                styles.progressSweep,
+                styles.brandWrap,
                 {
-                  transform: [{ translateX: progressTranslateX }],
+                  marginBottom: brandGap,
+                  opacity: iconOpacity,
+                  transform: [{ scale: iconScale }],
                 },
               ]}
-            />
-          </View>
+            >
+              <Image
+                source={LOADING_LOGO}
+                style={[
+                  styles.logo,
+                  {
+                    width: logoWidth,
+                    height: logoHeight,
+                  },
+                ]}
+                resizeMode="contain"
+                {...(androidSharpImageProps as any)}
+                accessibilityLabel="CineEntry 로고"
+                fadeDuration={0}
+              />
+            </Animated.View>
 
-          <Text
-            style={[
-              styles.helper,
-              {
-                fontSize: helperFontSize,
-                lineHeight: helperLineHeight,
-              },
-            ]}
-          >
-            영화와 취향의 흐름을 차분하게 이어 붙이는 중
-          </Text>
+            <Text
+              style={[
+                styles.subtitle,
+                {
+                  fontSize: subtitleFontSize,
+                  lineHeight: subtitleLineHeight,
+                  marginBottom: subtitleGap,
+                },
+              ]}
+            >
+              당신의 기록장을 준비하고 있어요
+            </Text>
+
+            <View style={[styles.progressTrack, { width: trackWidth }]}>
+              <Animated.View
+                style={[
+                  styles.progressSweep,
+                  {
+                    transform: [{ translateX: progressTranslateX }],
+                  },
+                ]}
+              />
+            </View>
+
+            <Text
+              style={[
+                styles.helper,
+                {
+                  fontSize: helperFontSize,
+                  lineHeight: helperLineHeight,
+                },
+              ]}
+            >
+              영화와 취향의 흐름을 차분하게 이어 붙이는 중
+            </Text>
+          </View>
         </View>
 
         <View style={[styles.footer, { paddingBottom: footerPaddingBottom }]}>
@@ -261,14 +259,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255,255,255,0.02)",
   },
-  halo: {
-    position: "absolute",
-    alignSelf: "center",
-    width: 320,
-    height: 320,
-    borderRadius: 160,
-    backgroundColor: "rgba(212,175,55,0.18)",
-  },
   edgeVignette: {
     ...StyleSheet.absoluteFillObject,
     borderColor: "rgba(0,0,0,0.26)",
@@ -279,8 +269,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     justifyContent: "space-between",
   },
-  spacer: {
+  mainArea: {
     flex: 1,
+    justifyContent: "center",
   },
   centerBlock: {
     alignSelf: "center",
@@ -288,6 +279,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   brandWrap: {
+    alignItems: "center",
+  },
+  logo: {
   },
   subtitle: {
     color: COLORS.lightGray,
