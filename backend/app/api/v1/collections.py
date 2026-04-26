@@ -141,6 +141,8 @@ async def get_collection_detail(
             rating=user_movie.rating,
             year=movie.year,
             status=normalize_status_output(user_movie.status),
+            content_type=movie.content_type,
+            release_channel=movie.release_channel or "unknown",
         ))
 
     collection_data = CollectionWithMovies(

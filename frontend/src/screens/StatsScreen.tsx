@@ -29,6 +29,8 @@ export default function StatsScreen() {
     yearly_progress: 0,
     yearly_goal_percentage: 0,
     total_watched: 0,
+    completed_movie_count: 0,
+    completed_series_count: 0,
     average_rating: 0,
     total_watch_time: 0,
     current_streak: 0,
@@ -176,7 +178,10 @@ export default function StatsScreen() {
               <Ionicons name="film-outline" size={20} color={COLORS.gold} />
             </View>
             <Text style={styles.heroValue}>{displayStats.total_watched || 0}</Text>
-            <Text style={styles.heroLabel}>총 관람 (편)</Text>
+            <Text style={styles.heroLabel}>총 감상 (작품)</Text>
+            <Text style={styles.heroSubLabel}>
+              영화 {displayStats.completed_movie_count || 0} · 시리즈 {displayStats.completed_series_count || 0}
+            </Text>
           </View>
           <View style={styles.heroDividerVertical} />
           <View style={styles.heroCell}>
@@ -217,7 +222,7 @@ export default function StatsScreen() {
           </View>
           <View style={styles.goalNumbers}>
             <Text style={styles.goalWatched}>{watched}</Text>
-            <Text style={styles.goalTotal}> / {yearlyGoal}편</Text>
+          <Text style={styles.goalTotal}> / {yearlyGoal}작품</Text>
           </View>
         </View>
         <View style={styles.progressBarContainer}>
@@ -255,7 +260,7 @@ export default function StatsScreen() {
 
       {/* Monthly Chart */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>월별 관람 추이</Text>
+        <Text style={styles.sectionTitle}>월별 감상 추이</Text>
         {monthlyData.length > 0 ? (
           <View style={styles.chartContainer}>
             {monthlyData.map((item: any, index: number) => {
@@ -289,7 +294,7 @@ export default function StatsScreen() {
         ) : (
           <View style={styles.emptyState}>
             <Ionicons name="bar-chart-outline" size={40} color={COLORS.lightGray} />
-            <Text style={styles.emptyText}>아직 관람 기록이 없습니다</Text>
+            <Text style={styles.emptyText}>아직 감상 기록이 없습니다</Text>
           </View>
         )}
       </View>
@@ -306,7 +311,7 @@ export default function StatsScreen() {
                   <View style={styles.genreTopRow}>
                     <Text style={styles.genreText}>{item.genre}</Text>
                     <Text style={styles.genreCount}>
-                      {item.count}편 <Text style={styles.genrePercent}>{item.percentage?.toFixed(0) ?? 0}%</Text>
+                      {item.count}작품 <Text style={styles.genrePercent}>{item.percentage?.toFixed(0) ?? 0}%</Text>
                     </Text>
                   </View>
                   <View style={styles.genreBarBg}>
@@ -417,6 +422,12 @@ const styles = StyleSheet.create({
   heroLabel: {
     fontSize: 12,
     color: COLORS.lightGray,
+  },
+  heroSubLabel: {
+    fontSize: 10,
+    color: COLORS.gold,
+    marginTop: 3,
+    fontWeight: "700",
   },
   heroDividerVertical: {
     width: 1,

@@ -466,7 +466,7 @@ export default function EditProfileScreen() {
 
           {/* 연간 목표 */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>연간 관람 목표</Text>
+            <Text style={styles.fieldLabel}>연간 감상 목표</Text>
             <View style={styles.goalRow}>
               <TextInput
                 style={[styles.textInput, styles.goalInput]}
@@ -478,9 +478,9 @@ export default function EditProfileScreen() {
                 maxLength={3}
                 returnKeyType="done"
               />
-              <Text style={styles.goalUnit}>편</Text>
+              <Text style={styles.goalUnit}>작품</Text>
             </View>
-            <Text style={styles.fieldHint}>{`올해 목표 관람 횟수를 설정하세요 (${YEARLY_GOAL_MIN}~${YEARLY_GOAL_MAX})`}</Text>
+            <Text style={styles.fieldHint}>{`올해 목표 감상 작품 수를 설정하세요 (${YEARLY_GOAL_MIN}~${YEARLY_GOAL_MAX})`}</Text>
           </View>
         </View>
 

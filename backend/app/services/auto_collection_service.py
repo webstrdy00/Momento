@@ -16,8 +16,8 @@ from app.models.movie import Movie
 # 회원가입 시 자동 생성되는 기본 컬렉션 정의
 DEFAULT_AUTO_COLLECTIONS = [
     {
-        "name": "올해 본 영화",
-        "description": "올해 관람 완료한 영화",
+        "name": "올해 감상한 작품",
+        "description": "올해 감상 완료한 작품",
         "auto_rules": {
             "status": "completed",
             "watch_date": {"min": f"{datetime.now().year}-01-01", "max": f"{datetime.now().year}-12-31"},
@@ -25,7 +25,7 @@ DEFAULT_AUTO_COLLECTIONS = [
     },
     {
         "name": "별점 4점 이상",
-        "description": "높게 평가한 영화 모음",
+        "description": "높게 평가한 작품 모음",
         "auto_rules": {
             "status": "completed",
             "rating": {"min": 4.0},
@@ -33,14 +33,14 @@ DEFAULT_AUTO_COLLECTIONS = [
     },
     {
         "name": "인생 영화",
-        "description": "인생 영화로 선택한 작품들",
+        "description": "인생 작품으로 선택한 기록",
         "auto_rules": {
             "is_best_movie": True,
         },
     },
     {
-        "name": "보고 싶은 영화",
-        "description": "보고 싶은 영화 목록",
+        "name": "보고 싶은 작품",
+        "description": "보고 싶은 작품 목록",
         "auto_rules": {
             "status": "watchlist",
         },
@@ -271,7 +271,15 @@ class AutoCollectionService:
         if "is_best_movie" in rules:
             query = query.filter(UserMovie.is_best_movie == rules["is_best_movie"])
 
-        # 7. watch_date 필터 (min, max)
+        # 7. content_type 필터 (movie, series)
+        if "content_type" in rules:
+            query = query.filter(Movie.movie_type == rules["content_type"])
+
+        # 8. release_channel 필터
+        if "release_channel" in rules:
+            query = query.filter(Movie.release_channel == rules["release_channel"])
+
+        # 9. watch_date 필터 (min, max)
         if "watch_date" in rules:
             watch_date_rule = rules["watch_date"]
             if isinstance(watch_date_rule, dict):
@@ -307,7 +315,7 @@ class AutoCollectionService:
         # 허용된 필드 목록
         allowed_fields = [
             "status", "rating", "year", "genre", "director",
-            "is_best_movie", "watch_date"
+            "is_best_movie", "watch_date", "content_type", "release_channel"
         ]
 
         # 필드 검증
@@ -347,6 +355,14 @@ class AutoCollectionService:
         if "is_best_movie" in rules:
             if not isinstance(rules["is_best_movie"], bool):
                 raise ValueError("is_best_movie must be a boolean")
+
+        if "content_type" in rules:
+            if rules["content_type"] not in ["movie", "series"]:
+                raise ValueError(f"Invalid content_type: {rules['content_type']}")
+
+        if "release_channel" in rules:
+            if rules["release_channel"] not in ["theatrical", "ott_original", "tv", "unknown"]:
+                raise ValueError(f"Invalid release_channel: {rules['release_channel']}")
 
         return True
 

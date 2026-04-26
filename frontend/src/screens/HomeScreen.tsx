@@ -32,6 +32,8 @@ export default function HomeScreen() {
     yearly_goal: 100,
     yearly_progress: 0,
     total_watched: 0,
+    completed_movie_count: 0,
+    completed_series_count: 0,
     current_streak: 0,
     average_rating: 0,
   }
@@ -168,6 +170,26 @@ export default function HomeScreen() {
     return watchDates.includes(dateStr)
   }
 
+  const getWatchingProgressText = (item: any) => {
+    if ((item.content_type ?? "movie") === "series") {
+      const season = item.current_season || 1
+      const episode = item.current_episode || 0
+      const total = item.total_episodes || 0
+      if (total > 0) return `시즌 ${season} · ${episode}/${total}화`
+      return `시즌 ${season} · ${episode}화까지`
+    }
+    return `${item.progress || 0}분 / ${item.runtime || 0}분`
+  }
+
+  const getWatchingProgressPercent = (item: any) => {
+    if ((item.content_type ?? "movie") === "series") {
+      const total = item.total_episodes || 0
+      if (total <= 0) return 0
+      return Math.min(100, ((item.current_episode || 0) / total) * 100)
+    }
+    return Math.min(100, ((item.progress || 0) / (item.runtime || 1)) * 100)
+  }
+
   const thisWeekDates = getThisWeekDates()
   const weekDayLabels = ['월', '화', '수', '목', '금', '토', '일']
   const streakWatchDates: string[] = streakData?.streak_dates || []
@@ -195,7 +217,7 @@ export default function HomeScreen() {
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <View>
             <Text style={styles.greeting}>어서오세요 :)</Text>
-            <Text style={styles.subtitle}>오늘은 무슨 영화를 보셨나요?</Text>
+            <Text style={styles.subtitle}>오늘은 어떤 작품을 감상하셨나요?</Text>
           </View>
         </View>
 
@@ -203,8 +225,8 @@ export default function HomeScreen() {
       {watchingMovies.length > 0 ? (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>현재 보고 있는 영화</Text>
-            <Text style={styles.watchingCount}>{watchingMovies.length}편</Text>
+            <Text style={styles.sectionTitle}>현재 보고 있는 작품</Text>
+            <Text style={styles.watchingCount}>{watchingMovies.length}작품</Text>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.currentMovieList}>
             {watchingMovies.map((watchingMovie) => (
@@ -223,18 +245,13 @@ export default function HomeScreen() {
                       </Text>
                       <View style={styles.progressContainer}>
                         <Text style={styles.progressText}>
-                          {watchingMovie.progress || 0}분 / {watchingMovie.runtime || 0}분
+                          {getWatchingProgressText(watchingMovie)}
                         </Text>
                         <View style={styles.progressBar}>
                           <View
                             style={[
                               styles.progressFill,
-                              {
-                                width: `${Math.min(
-                                  100,
-                                  ((watchingMovie.progress || 0) / (watchingMovie.runtime || 1)) * 100
-                                )}%`,
-                              },
+                              { width: `${getWatchingProgressPercent(watchingMovie)}%` },
                             ]}
                           />
                         </View>
@@ -249,9 +266,9 @@ export default function HomeScreen() {
       ) : (
         <View style={styles.emptyCard}>
           <Ionicons name="film-outline" size={40} color={COLORS.lightGray} />
-          <Text style={styles.emptyText}>현재 보고 있는 영화가 없습니다</Text>
+          <Text style={styles.emptyText}>현재 보고 있는 작품이 없습니다</Text>
           <TouchableOpacity onPress={() => navigation.navigate("MovieSearch")}>
-            <Text style={styles.emptyLink}>영화 추가하기</Text>
+            <Text style={styles.emptyLink}>작품 추가하기</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -267,7 +284,7 @@ export default function HomeScreen() {
           <Text style={styles.goalNumbers}>
             <Text style={styles.goalCurrent}>{yearlyGoal.current}</Text>
             <Text style={styles.goalSeparator}> / </Text>
-            <Text style={styles.goalTarget}>{yearlyGoal.target}편</Text>
+            <Text style={styles.goalTarget}>{yearlyGoal.target}작품</Text>
           </Text>
           <View style={styles.goalProgressBar}>
             <View style={[styles.goalProgressFill, { width: `${yearlyProgress}%` }]} />
@@ -304,8 +321,8 @@ export default function HomeScreen() {
           color={COLORS.gold}
         />
         <StatCard
-          title="총 관람"
-          value={`${stats.total_watched || 0}편`}
+          title="총 감상"
+          value={`${stats.total_watched || 0}작품`}
           icon="film-outline"
           color={COLORS.gold}
         />
@@ -374,7 +391,7 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
               <Ionicons name="bookmark" size={20} color={COLORS.gold} style={{ marginRight: 6 }} />
-              <Text style={styles.sectionTitle}>보고 싶은 영화</Text>
+              <Text style={styles.sectionTitle}>보고 싶은 작품</Text>
             </View>
             {watchlistMovies.length > 0 && (
               <TouchableOpacity
@@ -403,9 +420,9 @@ export default function HomeScreen() {
           ) : (
             <View style={styles.watchlistEmptyCard}>
               <Ionicons name="bookmark-outline" size={36} color={COLORS.lightGray} />
-              <Text style={styles.emptyText}>보고 싶은 영화가 없습니다</Text>
+              <Text style={styles.emptyText}>보고 싶은 작품이 없습니다</Text>
               <TouchableOpacity onPress={() => navigation.navigate("MovieSearch")}>
-                <Text style={styles.emptyLink}>영화 추가하기</Text>
+                <Text style={styles.emptyLink}>작품 추가하기</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -445,14 +462,14 @@ export default function HomeScreen() {
                     )}
                   </View>
                   <Text style={styles.collectionCardName} numberOfLines={1}>{collection.name}</Text>
-                  <Text style={styles.collectionCardCount}>{collection.movie_count}편</Text>
+                  <Text style={styles.collectionCardCount}>{collection.movie_count}작품</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           ) : (
             <View style={styles.watchlistEmptyCard}>
               <Ionicons name="sparkles" size={36} color={COLORS.lightGray} />
-              <Text style={styles.emptyText}>영화를 기록하면 자동으로 컬렉션이 생성됩니다</Text>
+              <Text style={styles.emptyText}>작품을 기록하면 자동으로 컬렉션이 생성됩니다</Text>
             </View>
           )}
         </View>

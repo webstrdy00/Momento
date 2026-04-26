@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import date
@@ -31,6 +31,50 @@ def build_tag_items(user_movie: UserMovie) -> list[dict]:
     ]
 
 
+def build_flat_movie_response(user_movie: UserMovie) -> FlatMovieResponse:
+    """UserMovie + Movie 관계를 프론트엔드 호환 flat 응답으로 변환."""
+    movie = user_movie.movie
+    return FlatMovieResponse(
+        # UserMovie 필드
+        id=user_movie.id,
+        user_id=user_movie.user_id,
+        status=normalize_status_output(user_movie.status),
+        rating=float(user_movie.rating) if user_movie.rating is not None else None,
+        review=user_movie.one_line_review,
+        watch_date=user_movie.watch_date,
+        progress=user_movie.progress,
+        current_season=user_movie.current_season,
+        current_episode=user_movie.current_episode,
+        watch_method=user_movie.watch_method,
+        watch_location=user_movie.watch_location,
+        watched_with=user_movie.watched_with,
+        is_best_movie=user_movie.is_best_movie,
+
+        # Movie 필드 (평평하게 + 필드명 변경)
+        movie_id=movie.id,
+        title=movie.title,
+        original_title=movie.original_title,
+        content_type=movie.content_type,
+        release_channel=movie.release_channel or "unknown",
+        poster=movie.poster_url,
+        backdrop=movie.backdrop_url,
+        year=movie.year,
+        runtime=movie.runtime,
+        total_episodes=movie.total_episodes,
+        genre=movie.genre,
+        director=movie.director,
+        synopsis=movie.synopsis,
+        kobis_code=movie.kobis_code,
+        tmdb_id=movie.tmdb_id,
+        kmdb_id=movie.kmdb_id,
+        tags=build_tag_items(user_movie),
+
+        # 메타데이터
+        created_at=user_movie.created_at,
+        updated_at=user_movie.updated_at,
+    )
+
+
 def normalize_status_input(status: Optional[str]) -> Optional[str]:
     """레거시 상태값(wishlist)을 watchlist로 정규화."""
     if status in ("wishlist", "watchlist"):
@@ -48,6 +92,8 @@ def normalize_status_output(status: Optional[str]) -> Optional[str]:
 @router.get("/", response_model=BaseResponse[List[FlatMovieResponse]])
 async def get_user_movies(
     status: Optional[str] = Query(None, description="Filter by status: watchlist, watching, completed"),
+    content_type: Optional[str] = Query(None, description="Filter by content type: movie, series"),
+    release_channel: Optional[str] = Query(None, description="Filter by release channel: theatrical, ott_original, tv, unknown"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
@@ -56,6 +102,8 @@ async def get_user_movies(
 
     Query Parameters:
     - status: Filter by movie status (watchlist, watching, completed)
+    - content_type: Filter by content type (movie, series)
+    - release_channel: Filter by release channel (theatrical, ott_original, tv, unknown)
     """
     query = db.query(UserMovie).options(joinedload(UserMovie.movie)).filter(UserMovie.user_id == user_id)
 
@@ -66,41 +114,18 @@ async def get_user_movies(
         else:
             query = query.filter(UserMovie.status == normalized_status)
 
+    if content_type or release_channel:
+        query = query.join(Movie)
+
+    if content_type:
+        query = query.filter(Movie.movie_type == content_type)
+
+    if release_channel:
+        query = query.filter(Movie.release_channel == release_channel)
+
     user_movies = query.order_by(UserMovie.updated_at.desc(), UserMovie.created_at.desc()).all()
 
-    # Convert to flat structure
-    result = []
-    for um in user_movies:
-        result.append(FlatMovieResponse(
-            # UserMovie 필드
-            id=um.id,
-            user_id=um.user_id,
-            status=normalize_status_output(um.status),
-            rating=um.rating,
-            review=um.one_line_review,
-            watch_date=um.watch_date,
-            progress=um.progress,
-            is_best_movie=um.is_best_movie,
-
-            # Movie 필드 (평평하게 + 필드명 변경)
-            movie_id=um.movie.id,
-            title=um.movie.title,
-            original_title=um.movie.original_title,
-            poster=um.movie.poster_url,  # poster_url → poster
-            backdrop=um.movie.backdrop_url,  # backdrop_url → backdrop
-            year=um.movie.year,
-            runtime=um.movie.runtime,
-            genre=um.movie.genre,
-            director=um.movie.director,
-            synopsis=um.movie.synopsis,
-            kobis_code=um.movie.kobis_code,
-            tmdb_id=um.movie.tmdb_id,
-            kmdb_id=um.movie.kmdb_id,
-
-            # 메타데이터
-            created_at=um.created_at,
-            updated_at=um.updated_at,
-        ))
+    result = [build_flat_movie_response(um) for um in user_movies]
 
     return BaseResponse(
         success=True,
@@ -156,38 +181,7 @@ async def get_movie_detail(
             detail="Movie not found in your library",
         )
 
-    # Convert to flat structure
-    movie_data = FlatMovieResponse(
-        # UserMovie 필드
-        id=user_movie.id,
-        user_id=user_movie.user_id,
-        status=normalize_status_output(user_movie.status),
-        rating=user_movie.rating,
-        review=user_movie.one_line_review,
-        watch_date=user_movie.watch_date,
-        progress=user_movie.progress,
-        is_best_movie=user_movie.is_best_movie,
-
-        # Movie 필드 (평평하게 + 필드명 변경)
-        movie_id=user_movie.movie.id,
-        title=user_movie.movie.title,
-        original_title=user_movie.movie.original_title,
-        poster=user_movie.movie.poster_url,  # poster_url → poster
-        backdrop=user_movie.movie.backdrop_url,  # backdrop_url → backdrop
-        year=user_movie.movie.year,
-        runtime=user_movie.movie.runtime,
-        genre=user_movie.movie.genre,
-        director=user_movie.movie.director,
-        synopsis=user_movie.movie.synopsis,
-        kobis_code=user_movie.movie.kobis_code,
-        tmdb_id=user_movie.movie.tmdb_id,
-        kmdb_id=user_movie.movie.kmdb_id,
-        tags=build_tag_items(user_movie),
-
-        # 메타데이터
-        created_at=user_movie.created_at,
-        updated_at=user_movie.updated_at,
-    )
+    movie_data = build_flat_movie_response(user_movie)
 
     return BaseResponse(
         success=True,
@@ -260,38 +254,7 @@ async def add_movie(
         .first()
     )
 
-    # Convert to flat structure
-    movie_data = FlatMovieResponse(
-        # UserMovie 필드
-        id=user_movie.id,
-        user_id=user_movie.user_id,
-        status=normalize_status_output(user_movie.status),
-        rating=user_movie.rating,
-        review=user_movie.one_line_review,
-        watch_date=user_movie.watch_date,
-        progress=user_movie.progress,
-        is_best_movie=user_movie.is_best_movie,
-
-        # Movie 필드
-        movie_id=user_movie.movie.id,
-        title=user_movie.movie.title,
-        original_title=user_movie.movie.original_title,
-        poster=user_movie.movie.poster_url,
-        backdrop=user_movie.movie.backdrop_url,
-        year=user_movie.movie.year,
-        runtime=user_movie.movie.runtime,
-        genre=user_movie.movie.genre,
-        director=user_movie.movie.director,
-        synopsis=user_movie.movie.synopsis,
-        kobis_code=user_movie.movie.kobis_code,
-        tmdb_id=user_movie.movie.tmdb_id,
-        kmdb_id=user_movie.movie.kmdb_id,
-        tags=build_tag_items(user_movie),
-
-        # 메타데이터
-        created_at=user_movie.created_at,
-        updated_at=user_movie.updated_at,
-    )
+    movie_data = build_flat_movie_response(user_movie)
 
     # 자동 컬렉션 동기화
     try:
@@ -344,12 +307,18 @@ async def update_movie(
     if next_status == "completed" and "watch_date" not in update_dict and user_movie.watch_date is None:
         update_dict["watch_date"] = date.today()
 
-    # genre, runtime은 Movie 테이블에 저장
+    # genre, runtime, 작품 형식/공개 방식은 Movie 테이블에 저장
     movie_updates = {}
     if "genre" in update_dict:
         movie_updates["genre"] = update_dict.pop("genre")
     if "runtime" in update_dict:
         movie_updates["runtime"] = update_dict.pop("runtime")
+    if "content_type" in update_dict:
+        movie_updates["movie_type"] = update_dict.pop("content_type")
+    if "release_channel" in update_dict:
+        movie_updates["release_channel"] = update_dict.pop("release_channel")
+    if "total_episodes" in update_dict:
+        movie_updates["total_episodes"] = update_dict.pop("total_episodes")
     if movie_updates:
         movie = db.query(Movie).filter(Movie.id == user_movie.movie_id).first()
         if movie:
@@ -363,39 +332,17 @@ async def update_movie(
     db.refresh(user_movie)
 
     # Load movie relationship
-    user_movie = db.query(UserMovie).options(joinedload(UserMovie.movie)).filter(UserMovie.id == user_movie.id).first()
-
-    # Convert to flat structure
-    movie_data = FlatMovieResponse(
-        # UserMovie 필드
-        id=user_movie.id,
-        user_id=user_movie.user_id,
-        status=normalize_status_output(user_movie.status),
-        rating=user_movie.rating,
-        review=user_movie.one_line_review,
-        watch_date=user_movie.watch_date,
-        progress=user_movie.progress,
-        is_best_movie=user_movie.is_best_movie,
-
-        # Movie 필드
-        movie_id=user_movie.movie.id,
-        title=user_movie.movie.title,
-        original_title=user_movie.movie.original_title,
-        poster=user_movie.movie.poster_url,
-        backdrop=user_movie.movie.backdrop_url,
-        year=user_movie.movie.year,
-        runtime=user_movie.movie.runtime,
-        genre=user_movie.movie.genre,
-        director=user_movie.movie.director,
-        synopsis=user_movie.movie.synopsis,
-        kobis_code=user_movie.movie.kobis_code,
-        tmdb_id=user_movie.movie.tmdb_id,
-        kmdb_id=user_movie.movie.kmdb_id,
-
-        # 메타데이터
-        created_at=user_movie.created_at,
-        updated_at=user_movie.updated_at,
+    user_movie = (
+        db.query(UserMovie)
+        .options(
+            joinedload(UserMovie.movie),
+            joinedload(UserMovie.movie_tags).joinedload(MovieTag.tag),
+        )
+        .filter(UserMovie.id == user_movie.id)
+        .first()
     )
+
+    movie_data = build_flat_movie_response(user_movie)
 
     # 자동 컬렉션 동기화
     try:
@@ -449,7 +396,7 @@ async def delete_movie(
 
 @router.get("/metadata/{source}/{id}", response_model=BaseResponse[MovieMetadata])
 async def get_movie_metadata(
-    source: str = Path(..., description="Source: 'kobis' or 'tmdb'"),
+    source: str = Path(..., description="Source: 'kobis', 'tmdb', or 'tmdb_tv'"),
     id: str = Path(..., description="Movie ID (kobis_code or tmdb_id)"),
     user_id: str = Depends(get_current_user),
 ):
@@ -457,7 +404,7 @@ async def get_movie_metadata(
     Get detailed movie metadata from external API
 
     Path Parameters:
-    - source: "kobis" or "tmdb"
+    - source: "kobis", "tmdb", or "tmdb_tv"
     - id: Movie ID (KOBIS code or TMDb ID)
 
     Returns:
@@ -465,12 +412,14 @@ async def get_movie_metadata(
     """
     if source == "tmdb":
         metadata = await external_api_service.get_tmdb_metadata(int(id))
+    elif source == "tmdb_tv":
+        metadata = await external_api_service.get_tmdb_tv_metadata(int(id))
     elif source == "kobis":
         metadata = await external_api_service.get_kobis_metadata(id)
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid source. Must be 'kobis' or 'tmdb'"
+            detail="Invalid source. Must be 'kobis', 'tmdb', or 'tmdb_tv'"
         )
 
     if not metadata:
@@ -532,7 +481,7 @@ async def create_movie_from_metadata(
     duplicate_filters = []
 
     if metadata.tmdb_id is not None:
-        duplicate_filters.append(Movie.tmdb_id == metadata.tmdb_id)
+        duplicate_filters.append(and_(Movie.tmdb_id == metadata.tmdb_id, Movie.movie_type == metadata.content_type))
     if metadata.kobis_code:
         duplicate_filters.append(Movie.kobis_code == metadata.kobis_code)
     if metadata.kmdb_id:
@@ -553,9 +502,12 @@ async def create_movie_from_metadata(
     movie = Movie(
         title_ko=metadata.title,
         title_original=metadata.original_title,
+        movie_type=metadata.content_type,
+        release_channel=metadata.release_channel,
         production_year=metadata.year if metadata.year else None,
         director=metadata.director,
         runtime=metadata.runtime,
+        total_episodes=metadata.total_episodes,
         genre=metadata.genre,
         poster_url=metadata.poster_url,
         backdrop_url=metadata.backdrop_url,
