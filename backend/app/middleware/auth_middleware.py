@@ -2,9 +2,12 @@
 Authentication Middleware
 자체 JWT 토큰 검증
 """
-from fastapi import HTTPException, Security, status
+from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
 
+from app.database import get_db
+from app.models.user import User
 from app.services.auth_service import verify_access_token
 
 security = HTTPBearer()
@@ -12,6 +15,7 @@ security = HTTPBearer()
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Security(security),
+    db: Session = Depends(get_db),
 ) -> str:
     """
     Access Token을 검증하고 user_id를 반환
@@ -27,16 +31,24 @@ async def get_current_user(
     """
     token = credentials.credentials
 
-    user_id = verify_access_token(token)
+    token_data = verify_access_token(token)
 
-    if not user_id:
+    if not token_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="유효하지 않거나 만료된 토큰입니다.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return user_id
+    user = db.query(User).filter(User.id == token_data["user_id"]).first()
+    if not user or user.token_version != token_data["token_version"]:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="세션이 만료되었습니다. 다시 로그인해주세요.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return str(user.id)
 
 
 # Alias for consistency
@@ -49,6 +61,7 @@ security_optional = HTTPBearer(auto_error=False)
 
 async def get_current_user_optional(
     credentials: HTTPAuthorizationCredentials = Security(security_optional),
+    db: Session = Depends(get_db),
 ) -> str | None:
     """
     토큰이 제공되면 user_id를 반환, 없으면 None
@@ -59,6 +72,6 @@ async def get_current_user_optional(
         return None
 
     try:
-        return await get_current_user(credentials)
+        return await get_current_user(credentials, db)
     except HTTPException:
         return None

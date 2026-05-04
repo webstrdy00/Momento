@@ -43,12 +43,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-def create_access_token(user_id: UUID) -> str:
+def create_access_token(user_id: UUID, token_version: int) -> str:
     """
     Access Token 생성 (짧은 수명)
 
     Args:
         user_id: 사용자 UUID
+        token_version: 현재 사용자의 token_version
 
     Returns:
         JWT Access Token
@@ -60,6 +61,7 @@ def create_access_token(user_id: UUID) -> str:
     payload = {
         "sub": str(user_id),
         "type": "access",
+        "token_version": token_version,
         "exp": expire,
         "iat": datetime.now(timezone.utc),
     }
@@ -118,7 +120,7 @@ def create_tokens(user_id: UUID, token_version: int) -> dict:
         }
     """
     return {
-        "access_token": create_access_token(user_id),
+        "access_token": create_access_token(user_id, token_version),
         "refresh_token": create_refresh_token(user_id, token_version),
         "token_type": "bearer",
         "expires_in": settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
@@ -148,15 +150,15 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 
-def verify_access_token(token: str) -> Optional[str]:
+def verify_access_token(token: str) -> Optional[dict]:
     """
-    Access Token을 검증하고 user_id를 반환합니다.
+    Access Token을 검증하고 user_id/token_version을 반환합니다.
 
     Args:
         token: Access Token
 
     Returns:
-        user_id 문자열 또는 None
+        {"user_id": str, "token_version": int} 또는 None
     """
     payload = decode_token(token)
 
@@ -166,7 +168,15 @@ def verify_access_token(token: str) -> Optional[str]:
     if payload.get("type") != "access":
         return None
 
-    return payload.get("sub")
+    user_id = payload.get("sub")
+    token_version = payload.get("token_version")
+    if not user_id or type(token_version) is not int:
+        return None
+
+    return {
+        "user_id": user_id,
+        "token_version": token_version,
+    }
 
 
 def verify_refresh_token(token: str) -> Optional[dict]:
@@ -187,7 +197,12 @@ def verify_refresh_token(token: str) -> Optional[dict]:
     if payload.get("type") != "refresh":
         return None
 
+    user_id = payload.get("sub")
+    token_version = payload.get("token_version")
+    if not user_id or type(token_version) is not int:
+        return None
+
     return {
-        "user_id": payload.get("sub"),
-        "token_version": payload.get("token_version"),
+        "user_id": user_id,
+        "token_version": token_version,
     }

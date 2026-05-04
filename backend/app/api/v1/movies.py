@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import date
@@ -320,6 +320,21 @@ async def update_movie(
     if "total_episodes" in update_dict:
         movie_updates["total_episodes"] = update_dict.pop("total_episodes")
     if movie_updates:
+        shared_by_other_users = (
+            db.query(func.count(UserMovie.id))
+            .filter(
+                UserMovie.movie_id == user_movie.movie_id,
+                UserMovie.user_id != user_id,
+            )
+            .scalar()
+            or 0
+        )
+        if shared_by_other_users > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="다른 사용자도 저장한 작품의 공통 메타데이터는 수정할 수 없습니다.",
+            )
+
         movie = db.query(Movie).filter(Movie.id == user_movie.movie_id).first()
         if movie:
             for field, value in movie_updates.items():
