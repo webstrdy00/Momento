@@ -201,7 +201,8 @@ export default function CalendarDownloadModal({
       }
 
       const filename = `cineentry_${year}${String(month).padStart(2, "0")}.png`
-      const shareUri = `${FileSystem.cacheDirectory}${filename}`
+      const cacheDirectory = `${FileSystem.Paths.cache.uri.replace(/\/?$/, "/")}`
+      const shareUri = `${cacheDirectory}${filename}`
       await FileSystem.copyAsync({ from: uri, to: shareUri })
 
       await Sharing.shareAsync(shareUri, {
@@ -427,12 +428,12 @@ export default function CalendarDownloadModal({
               <View style={[styles.previewSummary, { borderTopColor: dividerColor }]}>
                 <View style={styles.previewSummaryItem}>
                   <Text style={[styles.previewSummaryValue, { color: COLORS.gold }]}>{watchedDays}</Text>
-                  <Text style={[styles.previewSummaryLabel, { color: subtextColor }]}>시청한 날</Text>
+                  <Text style={[styles.previewSummaryLabel, { color: subtextColor }]}>감상한 날</Text>
                 </View>
                 <View style={[styles.previewSummaryDivider, { backgroundColor: dividerColor }]} />
                 <View style={styles.previewSummaryItem}>
                   <Text style={[styles.previewSummaryValue, { color: COLORS.gold }]}>{totalMovies}</Text>
-                  <Text style={[styles.previewSummaryLabel, { color: subtextColor }]}>총 시청 편수</Text>
+                  <Text style={[styles.previewSummaryLabel, { color: subtextColor }]}>총 감상 작품</Text>
                 </View>
               </View>
             </ViewShot>

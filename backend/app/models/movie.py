@@ -26,7 +26,9 @@ class Movie(Base):
     genre = Column(String(255))  # 쉼표 구분
     nation = Column(String(100))
     rating = Column(String(50))  # 관람등급
-    movie_type = Column(String(20))
+    movie_type = Column(String(20), nullable=False, default="movie", server_default="movie")  # 'movie' | 'series'
+    release_channel = Column(String(30), nullable=False, default="unknown", server_default="unknown")  # 'theatrical' | 'ott_original' | 'tv' | 'unknown'
+    total_episodes = Column(Integer)  # series일 때 전체 회차 수
 
     # 스태프
     director = Column(String(255))  # 쉼표 구분
@@ -58,3 +60,7 @@ class Movie(Base):
     @property
     def year(self) -> int | None:
         return self.production_year
+
+    @property
+    def content_type(self) -> str:
+        return self.movie_type or "movie"

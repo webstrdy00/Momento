@@ -12,9 +12,12 @@ class MovieBase(BaseModel):
     """Movie 기본 스키마"""
     title: str = Field(..., alias="title_ko")
     original_title: Optional[str] = Field(None, alias="title_original")
+    content_type: str = Field("movie", pattern="^(movie|series)$")
+    release_channel: str = Field("unknown", pattern="^(theatrical|ott_original|tv|unknown)$")
     director: Optional[str] = None
     year: Optional[int] = Field(None, alias="production_year")
     runtime: Optional[int] = None  # minutes
+    total_episodes: Optional[int] = Field(None, ge=0)
     genre: Optional[str] = None  # comma-separated
     poster_url: Optional[str] = None
     backdrop_url: Optional[str] = None
@@ -54,6 +57,11 @@ class UserMovieBase(BaseModel):
     one_line_review: Optional[str] = None  # 모델과 일치
     watch_date: Optional[date] = None
     progress: Optional[int] = None  # minutes watched
+    current_season: Optional[int] = Field(None, ge=0)
+    current_episode: Optional[int] = Field(None, ge=0)
+    watch_method: Optional[str] = Field(None, pattern="^(theater|ott|tv|other)$")
+    watch_location: Optional[str] = None
+    watched_with: Optional[str] = None
     is_best_movie: bool = False  # 모델과 일치
 
 
@@ -69,9 +77,17 @@ class UserMovieUpdate(BaseModel):
     one_line_review: Optional[str] = None
     watch_date: Optional[date] = None
     progress: Optional[int] = None
+    current_season: Optional[int] = Field(None, ge=0)
+    current_episode: Optional[int] = Field(None, ge=0)
+    watch_method: Optional[str] = Field(None, pattern="^(theater|ott|tv|other)$")
+    watch_location: Optional[str] = None
+    watched_with: Optional[str] = None
     is_best_movie: Optional[bool] = None
     genre: Optional[str] = None  # Movie 테이블 업데이트용
     runtime: Optional[int] = None  # Movie 테이블 업데이트용
+    content_type: Optional[str] = Field(None, pattern="^(movie|series)$")  # Movie 테이블 업데이트용
+    release_channel: Optional[str] = Field(None, pattern="^(theatrical|ott_original|tv|unknown)$")  # Movie 테이블 업데이트용
+    total_episodes: Optional[int] = Field(None, ge=0)  # Movie 테이블 업데이트용
 
 
 class UserMovieResponse(UserMovieBase):
@@ -102,16 +118,24 @@ class FlatMovieResponse(BaseModel):
     review: Optional[str] = None  # one_line_review
     watch_date: Optional[date] = None
     progress: Optional[int] = None
+    current_season: Optional[int] = None
+    current_episode: Optional[int] = None
+    watch_method: Optional[str] = None
+    watch_location: Optional[str] = None
+    watched_with: Optional[str] = None
     is_best_movie: bool = False
 
     # Movie 필드 (평평하게 - 필드명 변경)
     movie_id: int
     title: str
     original_title: Optional[str] = None
+    content_type: str = "movie"
+    release_channel: str = "unknown"
     poster: Optional[str] = None  # poster_url → poster
     backdrop: Optional[str] = None  # backdrop_url → backdrop
     year: Optional[int] = None
     runtime: Optional[int] = None
+    total_episodes: Optional[int] = None
     genre: Optional[str] = None
     director: Optional[str] = None
     synopsis: Optional[str] = None
@@ -129,9 +153,12 @@ class MovieSearchResult(BaseModel):
     """외부 API 영화 검색 결과"""
     title: str
     original_title: Optional[str] = None
+    content_type: str = Field("movie", pattern="^(movie|series)$")
+    release_channel: str = Field("unknown", pattern="^(theatrical|ott_original|tv|unknown)$")
     director: Optional[str] = None
     year: int
     runtime: Optional[int] = None
+    total_episodes: Optional[int] = Field(None, ge=0)
     genre: Optional[str] = None
     poster_url: Optional[str] = None
     backdrop_url: Optional[str] = None
@@ -146,9 +173,12 @@ class MovieMetadata(BaseModel):
     """영화 메타데이터 (외부 API에서 가져온 상세 정보)"""
     title: str
     original_title: Optional[str] = None
+    content_type: str = Field("movie", pattern="^(movie|series)$")
+    release_channel: str = Field("unknown", pattern="^(theatrical|ott_original|tv|unknown)$")
     director: Optional[str] = None
     year: Optional[int] = None
     runtime: Optional[int] = None
+    total_episodes: Optional[int] = Field(None, ge=0)
     genre: Optional[str] = None
     poster_url: Optional[str] = None
     backdrop_url: Optional[str] = None

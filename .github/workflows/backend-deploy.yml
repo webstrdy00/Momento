@@ -48,11 +48,20 @@ jobs:
           key: ${{ secrets.GCP_SSH_KEY }}
           script_stop: true
           script: |
-            set -e
+            set -euo pipefail
             cd /opt/cineentry/CineEntry
             git fetch origin main
             git checkout main
             git pull --ff-only origin main
+            if [ ! -f backend/.env.production ]; then
+              echo "backend/.env.production is missing on the server"
+              exit 1
+            fi
+            if [ ! -f /opt/cineentry/secrets/gcp-key.json ]; then
+              echo "/opt/cineentry/secrets/gcp-key.json is missing on the server"
+              exit 1
+            fi
+            docker compose -f docker-compose.prod.yml config >/dev/null
             docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
             docker image prune -f
             docker compose -f docker-compose.prod.yml ps

@@ -17,3 +17,4 @@ AGENTS.md
 
 /backend/gcp-key.json
 /backend/*gcp-key*.json
+/backend/.env.production.example

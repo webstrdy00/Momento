@@ -100,7 +100,7 @@ export default function CollectionDetailScreen() {
   }
 
   const handleRemoveMovie = (movieId: number) => {
-    showAlert("영화 제거", "이 영화를 컬렉션에서 제거하시겠습니까?", [
+    showAlert("작품 제거", "이 작품을 컬렉션에서 제거하시겠습니까?", [
       { text: "취소", style: "cancel" },
       {
         text: "제거",
@@ -108,10 +108,10 @@ export default function CollectionDetailScreen() {
         onPress: async () => {
           try {
             await removeMovieFromCollection(id, movieId)
-            showAlert("제거 완료", "영화가 컬렉션에서 제거되었습니다.")
+            showAlert("제거 완료", "작품이 컬렉션에서 제거되었습니다.")
             loadData()
           } catch (error) {
-            console.error('❌ 영화 제거 실패:', error)
+            console.error('❌ 작품 제거 실패:', error)
             showAlert("오류", "제거에 실패했습니다.")
           }
         },
@@ -199,7 +199,7 @@ export default function CollectionDetailScreen() {
               {collection.description && <Text style={styles.description}>{collection.description}</Text>}
               <View style={styles.metaRow}>
                 <Ionicons name="film-outline" size={16} color={COLORS.lightGray} />
-                <Text style={styles.metaText}>{collection.movie_count || collection.movies?.length || 0}편의 영화</Text>
+                <Text style={styles.metaText}>{collection.movie_count || collection.movies?.length || 0}개의 작품</Text>
                 {collection.is_auto && (
                   <>
                     <Ionicons name="sparkles" size={16} color={COLORS.gold} style={styles.metaIcon} />
@@ -244,7 +244,7 @@ export default function CollectionDetailScreen() {
           )}
         </View>
 
-        {/* 영화 목록 */}
+        {/* 작품 목록 */}
         <View style={styles.moviesSection}>
           <FlatList
             data={collection.movies}
@@ -256,17 +256,17 @@ export default function CollectionDetailScreen() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Ionicons name="film-outline" size={64} color={COLORS.lightGray} />
-                <Text style={styles.emptyTitle}>영화가 없습니다</Text>
-                <Text style={styles.emptySubtitle}>아래 버튼을 눌러 영화를 추가해보세요</Text>
+                <Text style={styles.emptyTitle}>작품이 없습니다</Text>
+                <Text style={styles.emptySubtitle}>아래 버튼을 눌러 작품을 추가해보세요</Text>
               </View>
             }
           />
 
-          {/* 영화 추가 버튼 */}
+          {/* 작품 추가 버튼 */}
           {!collection.is_auto && (
             <TouchableOpacity style={styles.addMovieButton} onPress={handleAddMovie}>
               <Ionicons name="add-circle-outline" size={24} color={COLORS.gold} />
-              <Text style={styles.addMovieText}>영화 추가</Text>
+              <Text style={styles.addMovieText}>작품 추가</Text>
             </TouchableOpacity>
           )}
         </View>

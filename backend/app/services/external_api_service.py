@@ -14,6 +14,10 @@ from app.services.redis_service import redis_service
 # Type variable for generic return types
 T = TypeVar('T')
 
+TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p"
+TMDB_IMAGE_LANGUAGE_FALLBACK = "ko,en,null"
+TMDB_SEARCH_IMAGE_ENRICH_LIMIT = 8
+
 
 def cache_external_api(prefix: str, ttl: int = 86400):
     """
@@ -123,15 +127,28 @@ def safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def build_tmdb_image_url(file_path: Optional[str], size: str = "w500") -> Optional[str]:
+    """TMDb file_path를 앱에서 바로 사용할 수 있는 이미지 URL로 변환."""
+    if not file_path:
+        return None
+    if file_path.startswith("http://") or file_path.startswith("https://"):
+        return file_path
+    normalized_path = file_path if file_path.startswith("/") else f"/{file_path}"
+    return f"{TMDB_IMAGE_BASE_URL}/{size}{normalized_path}"
+
+
 class ExternalAPIService:
     """외부 API 통합 서비스"""
 
     SEARCH_MERGE_FIELDS = (
         "title",
         "original_title",
+        "content_type",
+        "release_channel",
         "director",
         "year",
         "runtime",
+        "total_episodes",
         "genre",
         "poster_url",
         "backdrop_url",
@@ -143,9 +160,12 @@ class ExternalAPIService:
     SEARCH_FIELD_PRIORITIES = {
         "title": {"kobis": 4, "kmdb": 3, "tmdb": 2, "search": 1},
         "original_title": {"tmdb": 4, "kmdb": 3, "kobis": 2, "search": 1},
+        "content_type": {"tmdb_tv": 5, "tmdb": 4, "kobis": 3, "kmdb": 3, "search": 1},
+        "release_channel": {"kobis": 5, "tmdb_tv": 4, "tmdb": 3, "kmdb": 2, "search": 1},
         "director": {"kobis": 4, "kmdb": 3, "tmdb": 2, "search": 1},
         "year": {"kobis": 4, "tmdb": 3, "kmdb": 2, "search": 1},
         "runtime": {"tmdb": 4, "kmdb": 3, "kobis": 2, "search": 1},
+        "total_episodes": {"tmdb_tv": 5, "search": 1},
         "genre": {"kobis": 4, "kmdb": 3, "tmdb": 2, "search": 1},
         "poster_url": {"tmdb": 5, "kmdb": 4, "kobis": 1, "search": 1},
         "backdrop_url": {"tmdb": 5, "kmdb": 1, "kobis": 1, "search": 1},
@@ -157,9 +177,12 @@ class ExternalAPIService:
     METADATA_FIELD_PRIORITIES = {
         "title": {"kobis": 5, "kmdb": 4, "tmdb": 3, "search": 1},
         "original_title": {"tmdb": 5, "kmdb": 4, "kobis": 3, "search": 1},
+        "content_type": {"tmdb_tv": 5, "tmdb": 4, "kobis": 3, "kmdb": 3, "search": 1},
+        "release_channel": {"kobis": 5, "tmdb_tv": 4, "tmdb": 3, "kmdb": 2, "search": 1},
         "director": {"kobis": 5, "kmdb": 4, "tmdb": 3, "search": 1},
         "year": {"kobis": 5, "tmdb": 4, "kmdb": 3, "search": 1},
         "runtime": {"tmdb": 5, "kmdb": 4, "kobis": 3, "search": 1},
+        "total_episodes": {"tmdb_tv": 5, "search": 1},
         "genre": {"kobis": 5, "kmdb": 4, "tmdb": 3, "search": 1},
         "poster_url": {"tmdb": 5, "kmdb": 4, "search": 1},
         "backdrop_url": {"tmdb": 5, "search": 1},
@@ -252,9 +275,104 @@ class ExternalAPIService:
             return False
         if isinstance(value, str):
             return bool(value.strip())
-        if field_name in ("year", "runtime"):
+        if field_name in ("year", "runtime", "total_episodes"):
             return isinstance(value, int) and value > 0
+        if field_name == "release_channel":
+            return value in ("theatrical", "ott_original", "tv")
+        if field_name == "content_type":
+            return value in ("movie", "series")
         return True
+
+    @staticmethod
+    def _select_tmdb_image_path(images_payload: Optional[dict], image_key: str) -> Optional[str]:
+        """TMDb images 응답에서 언어/평점 우선순위로 대표 이미지를 선택."""
+        if not images_payload:
+            return None
+
+        images = images_payload.get(image_key) or []
+        if not images:
+            return None
+
+        language_priority = {"ko": 4, "en": 3, None: 2, "": 2}
+
+        def score(image: dict) -> tuple:
+            language = image.get("iso_639_1")
+            return (
+                language_priority.get(language, 1),
+                image.get("vote_average") or 0,
+                image.get("vote_count") or 0,
+                image.get("height") or 0,
+                image.get("width") or 0,
+            )
+
+        selected = max(images, key=score)
+        return selected.get("file_path")
+
+    def _poster_url_from_tmdb_payload(self, payload: dict, poster_size: str = "w500") -> Optional[str]:
+        """대표 poster_path가 없을 때 appended images 포스터로 fallback."""
+        poster_path = payload.get("poster_path") or self._select_tmdb_image_path(payload.get("images"), "posters")
+        return build_tmdb_image_url(poster_path, poster_size)
+
+    def _backdrop_url_from_tmdb_payload(self, payload: dict, backdrop_size: str = "original") -> Optional[str]:
+        """대표 backdrop_path가 없을 때 appended images backdrop으로 fallback."""
+        backdrop_path = payload.get("backdrop_path") or self._select_tmdb_image_path(payload.get("images"), "backdrops")
+        return build_tmdb_image_url(backdrop_path, backdrop_size)
+
+    async def _get_tmdb_images_payload(self, client: httpx.AsyncClient, media_type: str, tmdb_id: int) -> dict:
+        """검색 응답에서 이미지가 비어 있을 때 별도 images endpoint로 fallback 데이터를 가져온다."""
+        endpoint = "movie" if media_type == "movie" else "tv"
+        response = await client.get(
+            f"https://api.themoviedb.org/3/{endpoint}/{tmdb_id}/images",
+            params={
+                "api_key": settings.TMDB_API_KEY,
+                "language": "ko-KR",
+                "include_image_language": TMDB_IMAGE_LANGUAGE_FALLBACK,
+            },
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def _enrich_missing_tmdb_images(
+        self,
+        client: httpx.AsyncClient,
+        results: List[MovieSearchResult],
+    ) -> None:
+        """검색 결과 중 이미지가 비어 있는 상위 일부만 TMDb images endpoint로 보강."""
+        candidates = [
+            result for result in results
+            if result.tmdb_id is not None
+            and result.source in ("tmdb", "tmdb_tv")
+            and (not result.poster_url or not result.backdrop_url)
+        ][:TMDB_SEARCH_IMAGE_ENRICH_LIMIT]
+
+        if not candidates:
+            return
+
+        tasks = [
+            self._get_tmdb_images_payload(
+                client,
+                "series" if candidate.content_type == "series" or candidate.source == "tmdb_tv" else "movie",
+                candidate.tmdb_id,
+            )
+            for candidate in candidates
+        ]
+        images_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for candidate, images_payload in zip(candidates, images_results):
+            if isinstance(images_payload, Exception):
+                print(f"[search] TMDb 이미지 보강 실패: {candidate.tmdb_id} ({images_payload})")
+                continue
+
+            if not candidate.poster_url:
+                candidate.poster_url = build_tmdb_image_url(
+                    self._select_tmdb_image_path(images_payload, "posters"),
+                    "w500",
+                )
+            if not candidate.backdrop_url:
+                candidate.backdrop_url = build_tmdb_image_url(
+                    self._select_tmdb_image_path(images_payload, "backdrops"),
+                    "original",
+                )
 
     @staticmethod
     def _field_priority(field_priorities: dict, field_name: str, source: str) -> int:
@@ -291,14 +409,15 @@ class ExternalAPIService:
         """중복 병합용 식별 키 생성."""
         keys: Set[str] = set()
         year_key = str(result.year) if result.year and result.year > 0 else "0"
+        content_type = result.content_type or "movie"
 
         for text in (result.title, result.original_title):
             normalized_text = self._normalize_text(text)
             if normalized_text:
-                keys.add(f"title:{normalized_text}:{year_key}")
+                keys.add(f"title:{content_type}:{normalized_text}:{year_key}")
 
         if result.tmdb_id is not None:
-            keys.add(f"tmdb:{result.tmdb_id}")
+            keys.add(f"tmdb:{content_type}:{result.tmdb_id}")
         if result.kobis_code:
             keys.add(f"kobis:{result.kobis_code}")
         if result.kmdb_id:
@@ -332,6 +451,9 @@ class ExternalAPIService:
         second_result: MovieSearchResult,
     ) -> bool:
         """직접 키가 없어도 제목 alias와 연도로 동일 영화 여부를 추정한다."""
+        if (first_result.content_type or "movie") != (second_result.content_type or "movie"):
+            return False
+
         if not self._years_are_compatible(first_result.year, second_result.year):
             return False
 
@@ -432,9 +554,12 @@ class ExternalAPIService:
         return MovieMetadata(
             title=result.title,
             original_title=result.original_title,
+            content_type=result.content_type,
+            release_channel=result.release_channel,
             director=result.director,
             year=result.year,
             runtime=result.runtime,
+            total_episodes=result.total_episodes,
             genre=result.genre,
             poster_url=result.poster_url,
             backdrop_url=result.backdrop_url,
@@ -451,8 +576,12 @@ class ExternalAPIService:
         detail_tasks = []
 
         if result.tmdb_id is not None:
-            detail_sources.append("tmdb")
-            detail_tasks.append(self.get_tmdb_metadata(result.tmdb_id))
+            if result.content_type == "series" or result.source == "tmdb_tv":
+                detail_sources.append("tmdb_tv")
+                detail_tasks.append(self.get_tmdb_tv_metadata(result.tmdb_id))
+            else:
+                detail_sources.append("tmdb")
+                detail_tasks.append(self.get_tmdb_metadata(result.tmdb_id))
         if result.kobis_code:
             detail_sources.append("kobis")
             detail_tasks.append(self.get_kobis_metadata(result.kobis_code))
@@ -541,6 +670,7 @@ class ExternalAPIService:
         # 데이터 소스 신뢰도 가중치(동점 시 정렬 안정화 목적)
         source_weight = {
             "tmdb": 3,
+            "tmdb_tv": 3,
             "kobis": 2,
             "kmdb": 1,
         }
@@ -654,7 +784,7 @@ class ExternalAPIService:
 
         return self._rank_and_dedupe(normalized_query, results)
 
-    @cache_external_api(prefix="kobis:search:v2", ttl=86400)
+    @cache_external_api(prefix="kobis:search:v3", ttl=86400)
     async def search_kobis(self, query: str) -> List[MovieSearchResult]:
         """
         KOBIS API로 영화 검색 (한국영화진흥위원회)
@@ -687,9 +817,12 @@ class ExternalAPIService:
                 result = MovieSearchResult(
                     title=movie.get("movieNm", ""),
                     original_title=movie.get("movieNmEn"),
+                    content_type="movie",
+                    release_channel="theatrical",
                     director=director,
                     year=safe_int(movie.get("prdtYear")),
                     runtime=None,  # KOBIS doesn't provide runtime in search
+                    total_episodes=None,
                     genre=movie.get("repGenreNm"),
                     poster_url=None,  # KOBIS doesn't provide poster
                     backdrop_url=None,
@@ -703,34 +836,43 @@ class ExternalAPIService:
 
             return results
 
-    @cache_external_api(prefix="tmdb:search:v2", ttl=86400)
+    @cache_external_api(prefix="tmdb:search:v4", ttl=86400)
     async def search_tmdb(self, query: str) -> List[MovieSearchResult]:
         """
-        TMDb API로 영화 검색 (The Movie Database)
+        TMDb API로 영화/시리즈 검색 (The Movie Database)
 
         Args:
             query: 검색어
 
         Returns:
-            영화 검색 결과 리스트
+            영화/시리즈 검색 결과 리스트
         """
         async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                "https://api.themoviedb.org/3/search/movie",
-                params={
-                    "api_key": settings.TMDB_API_KEY,
-                    "query": query,
-                    "language": "ko-KR",
-                    "region": "KR",
-                    "include_adult": "false",
-                    "page": 1,
-                }
+            common_params = {
+                "api_key": settings.TMDB_API_KEY,
+                "query": query,
+                "language": "ko-KR",
+                "include_adult": "false",
+                "page": 1,
+            }
+
+            movie_response, tv_response = await asyncio.gather(
+                client.get(
+                    "https://api.themoviedb.org/3/search/movie",
+                    params={**common_params, "region": "KR"},
+                ),
+                client.get(
+                    "https://api.themoviedb.org/3/search/tv",
+                    params=common_params,
+                ),
             )
-            response.raise_for_status()
-            data = response.json()
+            movie_response.raise_for_status()
+            tv_response.raise_for_status()
+            movie_data = movie_response.json()
+            tv_data = tv_response.json()
 
             results = []
-            movies = data.get("results", [])
+            movies = movie_data.get("results", [])
 
             for movie in movies:
                 # Get release year
@@ -738,19 +880,19 @@ class ExternalAPIService:
                 year = safe_int(release_date[:4]) if (release_date and len(release_date) >= 4) else 0
 
                 # Get poster URL
-                poster_path = movie.get("poster_path")
-                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+                poster_url = build_tmdb_image_url(movie.get("poster_path"), "w500")
                 backdrop_path = movie.get("backdrop_path")
-                backdrop_url = (
-                    f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else None
-                )
+                backdrop_url = build_tmdb_image_url(backdrop_path, "original")
 
                 result = MovieSearchResult(
                     title=movie.get("title", ""),
                     original_title=movie.get("original_title"),
+                    content_type="movie",
+                    release_channel="unknown",
                     director=None,  # TMDb search doesn't include director
                     year=year,
                     runtime=None,  # Need to fetch details for runtime
+                    total_episodes=None,
                     genre=None,  # Genre requires separate API call
                     poster_url=poster_url,
                     backdrop_url=backdrop_url,
@@ -762,9 +904,39 @@ class ExternalAPIService:
                 )
                 results.append(result)
 
+            tv_items = tv_data.get("results", [])
+
+            for item in tv_items:
+                first_air_date = item.get("first_air_date", "")
+                year = safe_int(first_air_date[:4]) if (first_air_date and len(first_air_date) >= 4) else 0
+
+                poster_url = build_tmdb_image_url(item.get("poster_path"), "w500")
+                backdrop_url = build_tmdb_image_url(item.get("backdrop_path"), "original")
+
+                result = MovieSearchResult(
+                    title=item.get("name", ""),
+                    original_title=item.get("original_name"),
+                    content_type="series",
+                    release_channel="tv",
+                    director=None,
+                    year=year,
+                    runtime=None,
+                    total_episodes=None,
+                    genre=None,
+                    poster_url=poster_url,
+                    backdrop_url=backdrop_url,
+                    synopsis=item.get("overview"),
+                    kobis_code=None,
+                    tmdb_id=item.get("id"),
+                    kmdb_id=None,
+                    source="tmdb_tv",
+                )
+                results.append(result)
+
+            await self._enrich_missing_tmdb_images(client, results)
             return results
 
-    @cache_external_api(prefix="kmdb:search:v2", ttl=86400)
+    @cache_external_api(prefix="kmdb:search:v3", ttl=86400)
     async def search_kmdb(self, query: str) -> List[MovieSearchResult]:
         """
         KMDb API로 영화 검색 (한국영화데이터베이스)
@@ -814,9 +986,12 @@ class ExternalAPIService:
                 result = MovieSearchResult(
                     title=movie.get("title", "").replace("!HS", "").replace("!HE", ""),
                     original_title=movie.get("titleEng"),
+                    content_type="movie",
+                    release_channel="unknown",
                     director=director,
                     year=year,
                     runtime=runtime,
+                    total_episodes=None,
                     genre=genre,
                     poster_url=poster_url,
                     backdrop_url=None,
@@ -847,7 +1022,7 @@ class ExternalAPIService:
             return await self.get_kobis_metadata(kobis_code)
         return None
 
-    @cache_external_api(prefix="tmdb:movie", ttl=86400)
+    @cache_external_api(prefix="tmdb:movie:v2", ttl=86400)
     async def get_tmdb_metadata(self, tmdb_id: int) -> Optional[MovieMetadata]:
         """
         TMDb에서 영화 상세 정보 가져오기
@@ -864,7 +1039,8 @@ class ExternalAPIService:
                 params={
                     "api_key": settings.TMDB_API_KEY,
                     "language": "ko-KR",
-                    "append_to_response": "credits"
+                    "append_to_response": "credits,images",
+                    "include_image_language": TMDB_IMAGE_LANGUAGE_FALLBACK,
                 }
             )
             response.raise_for_status()
@@ -880,12 +1056,9 @@ class ExternalAPIService:
             release_date = movie.get("release_date", "")
             year = int(release_date[:4]) if release_date else 0
 
-            # Get poster and backdrop URLs
-            poster_path = movie.get("poster_path")
-            poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
-
-            backdrop_path = movie.get("backdrop_path")
-            backdrop_url = f"https://image.tmdb.org/t/p/original{backdrop_path}" if backdrop_path else None
+            # Get poster and backdrop URLs, including appended images fallback.
+            poster_url = self._poster_url_from_tmdb_payload(movie)
+            backdrop_url = self._backdrop_url_from_tmdb_payload(movie)
 
             # Get genres
             genres = movie.get("genres", [])
@@ -894,9 +1067,12 @@ class ExternalAPIService:
             metadata = MovieMetadata(
                 title=movie.get("title", ""),
                 original_title=movie.get("original_title"),
+                content_type="movie",
+                release_channel="unknown",
                 director=director,
                 year=year,
                 runtime=movie.get("runtime", 0),
+                total_episodes=None,
                 genre=genre,
                 poster_url=poster_url,
                 backdrop_url=backdrop_url,
@@ -907,6 +1083,70 @@ class ExternalAPIService:
             )
 
             return metadata
+
+    @cache_external_api(prefix="tmdb:tv:v2", ttl=86400)
+    async def get_tmdb_tv_metadata(self, tmdb_id: int) -> Optional[MovieMetadata]:
+        """
+        TMDb에서 시리즈 상세 정보 가져오기
+
+        Args:
+            tmdb_id: TMDb TV ID
+
+        Returns:
+            시리즈 메타데이터
+        """
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"https://api.themoviedb.org/3/tv/{tmdb_id}",
+                params={
+                    "api_key": settings.TMDB_API_KEY,
+                    "language": "ko-KR",
+                    "append_to_response": "credits,images",
+                    "include_image_language": TMDB_IMAGE_LANGUAGE_FALLBACK,
+                },
+            )
+            response.raise_for_status()
+            item = response.json()
+
+            credits = item.get("credits", {})
+            crew = credits.get("crew", [])
+            creators = item.get("created_by", [])
+            directors = [c for c in crew if c.get("job") in ("Director", "Series Director")]
+            director = None
+            if creators:
+                director = creators[0].get("name")
+            elif directors:
+                director = directors[0].get("name")
+
+            first_air_date = item.get("first_air_date", "")
+            year = safe_int(first_air_date[:4]) if first_air_date else 0
+
+            poster_url = self._poster_url_from_tmdb_payload(item)
+            backdrop_url = self._backdrop_url_from_tmdb_payload(item)
+
+            genres = item.get("genres", [])
+            genre = ", ".join([g.get("name") for g in genres if g.get("name")])
+
+            runtimes = item.get("episode_run_time") or []
+            runtime = safe_int(runtimes[0]) if runtimes else None
+
+            return MovieMetadata(
+                title=item.get("name", ""),
+                original_title=item.get("original_name"),
+                content_type="series",
+                release_channel="tv",
+                director=director,
+                year=year,
+                runtime=runtime,
+                total_episodes=item.get("number_of_episodes"),
+                genre=genre,
+                poster_url=poster_url,
+                backdrop_url=backdrop_url,
+                synopsis=item.get("overview"),
+                kobis_code=None,
+                tmdb_id=tmdb_id,
+                kmdb_id=None,
+            )
 
     @cache_external_api(prefix="kobis:movie", ttl=86400)
     async def get_kobis_metadata(self, kobis_code: str) -> Optional[MovieMetadata]:
@@ -951,9 +1191,12 @@ class ExternalAPIService:
             metadata = MovieMetadata(
                 title=movie.get("movieNm", ""),
                 original_title=movie.get("movieNmEn"),
+                content_type="movie",
+                release_channel="theatrical",
                 director=director,
                 year=year,
                 runtime=runtime,
+                total_episodes=None,
                 genre=genre,
                 poster_url=None,  # KOBIS doesn't provide poster
                 backdrop_url=None,

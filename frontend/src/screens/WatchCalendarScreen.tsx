@@ -386,14 +386,14 @@ export default function WatchCalendarScreen() {
                 <Text style={styles.summaryValue}>
                   {calendarData.days.filter(d => d.movie_count > 0).length}
                 </Text>
-                <Text style={styles.summaryLabel}>시청한 날</Text>
+                <Text style={styles.summaryLabel}>감상한 날</Text>
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryValue}>
                   {calendarData.days.reduce((sum, d) => sum + d.movie_count, 0)}
                 </Text>
-                <Text style={styles.summaryLabel}>총 시청 편수</Text>
+                <Text style={styles.summaryLabel}>총 감상 작품</Text>
               </View>
             </View>
           </View>
@@ -402,7 +402,7 @@ export default function WatchCalendarScreen() {
         {/* Movie List for the Month */}
         {!loading && calendarData && calendarData.days.some(d => d.movie_count > 0) && (
           <View style={styles.movieListSection}>
-            <Text style={styles.movieListTitle}>{month}월 시청 영화</Text>
+            <Text style={styles.movieListTitle}>{month}월 감상 작품</Text>
             {calendarData.days
               .filter(d => d.movie_count > 0)
               .map(day => (

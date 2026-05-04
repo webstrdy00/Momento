@@ -1,4 +1,5 @@
 import secrets
+from ipaddress import IPv4Network, IPv6Network, ip_network
 from typing import Optional
 
 from pydantic_settings import BaseSettings
@@ -53,6 +54,8 @@ class Settings(BaseSettings):
     GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
     GCP_BUCKET_NAME: Optional[str] = None
     GCP_SIGNED_URL_EXPIRATION_SECONDS: int = 900
+    MAX_IMAGE_UPLOAD_BYTES: int = 5 * 1024 * 1024
+    TRUSTED_PROXY_CIDRS: str = "127.0.0.1/32,::1/128"
 
     # AWS S3 (optional)
     AWS_ACCESS_KEY_ID: Optional[str] = None
@@ -123,6 +126,21 @@ class Settings(BaseSettings):
             origins.append(origin)
 
         return origins
+
+    def get_trusted_proxy_networks(self) -> list[IPv4Network | IPv6Network]:
+        """신뢰할 reverse proxy CIDR 목록 반환"""
+        networks: list[IPv4Network | IPv6Network] = []
+
+        for raw_cidr in self.TRUSTED_PROXY_CIDRS.split(","):
+            cidr = raw_cidr.strip()
+            if not cidr:
+                continue
+            try:
+                networks.append(ip_network(cidr, strict=False))
+            except ValueError:
+                continue
+
+        return networks
 
 
 # Global settings instance

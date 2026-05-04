@@ -7,6 +7,7 @@ import hashlib
 import json
 import secrets
 from html import escape
+from ipaddress import ip_address
 from string import Template
 from urllib.parse import urlencode
 
@@ -216,15 +217,27 @@ def _render_mobile_oauth_bridge_page(
 
 
 def _get_client_ip(http_request: Request) -> str:
-    forwarded_for = http_request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip() or "unknown"
+    direct_ip = http_request.client.host if http_request.client else "unknown"
 
-    real_ip = http_request.headers.get("x-real-ip")
-    if real_ip:
-        return real_ip.strip() or "unknown"
+    try:
+        direct_addr = ip_address(direct_ip)
+        trusted_proxy = any(
+            direct_addr in network
+            for network in settings.get_trusted_proxy_networks()
+        )
+    except ValueError:
+        trusted_proxy = False
 
-    return http_request.client.host if http_request.client else "unknown"
+    if trusted_proxy:
+        forwarded_for = http_request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            return forwarded_for.split(",")[0].strip() or "unknown"
+
+        real_ip = http_request.headers.get("x-real-ip")
+        if real_ip:
+            return real_ip.strip() or "unknown"
+
+    return direct_ip
 
 
 def _rate_limit_identities(email: str | None, client_ip: str | None) -> list[tuple[str, str]]:
@@ -315,6 +328,46 @@ def _ensure_email_verified_or_raise(user: User) -> None:
         detail=(
             "이메일 인증이 아직 완료되지 않았습니다. 가입 시 받은 인증 메일을 확인하거나 "
             "비밀번호 재설정을 완료한 뒤 다시 로그인해주세요."
+        ),
+    )
+
+
+def _is_google_email_verified(userinfo: dict) -> bool:
+    return (
+        userinfo.get("verified_email") is True
+        or userinfo.get("email_verified") is True
+    )
+
+
+def _is_kakao_email_verified(kakao_account: dict) -> bool:
+    return (
+        kakao_account.get("is_email_valid") is True
+        and kakao_account.get("is_email_verified") is True
+    )
+
+
+def _ensure_oauth_email_verified(provider: str, is_verified: bool) -> None:
+    if is_verified:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            f"{_provider_label(provider)} 계정의 이메일 인증 상태를 확인할 수 없습니다. "
+            "이메일 인증이 완료된 계정으로 다시 시도해주세요."
+        ),
+    )
+
+
+def _ensure_existing_user_can_link_oauth(user: User, provider: str) -> None:
+    if user.email_verified:
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "이미 같은 이메일로 가입된 계정이 있습니다. "
+            f"기존 계정의 이메일 인증을 완료한 뒤 {_provider_label(provider)} 로그인을 연결해주세요."
         ),
     )
 
@@ -1681,6 +1734,10 @@ async def refresh_token(
             detail="세션이 만료되었습니다. 다시 로그인해주세요.",
         )
 
+    user.token_version += 1
+    db.commit()
+    db.refresh(user)
+
     tokens = create_tokens(user.id, user.token_version)
 
     return BaseResponse(
@@ -1691,7 +1748,20 @@ async def refresh_token(
 
 
 @router.post("/logout", response_model=BaseResponse[dict])
-async def logout():
+async def logout(
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="사용자를 찾을 수 없습니다.",
+        )
+
+    user.token_version += 1
+    db.commit()
+
     return BaseResponse(
         success=True,
         message="로그아웃되었습니다.",
@@ -1978,11 +2048,13 @@ async def google_auth_callback(
             detail="이메일 정보를 가져올 수 없습니다.",
         )
 
+    _ensure_oauth_email_verified("google", _is_google_email_verified(userinfo))
+
     user = db.query(User).filter(User.email == email).first()
 
     if user:
+        _ensure_existing_user_can_link_oauth(user, "google")
         user.google_connected = True
-        user.email_verified = True
         if not user.display_name:
             user.display_name = userinfo.get("name", email.split("@")[0])
         if not user.avatar_url:
@@ -2123,12 +2195,14 @@ async def kakao_auth_callback(
             detail="이메일 정보를 가져올 수 없습니다. Kakao 계정에서 이메일 제공에 동의해주세요.",
         )
 
+    _ensure_oauth_email_verified("kakao", _is_kakao_email_verified(kakao_account))
+
     profile = kakao_account.get("profile", {})
     user = db.query(User).filter(User.email == email).first()
 
     if user:
+        _ensure_existing_user_can_link_oauth(user, "kakao")
         user.kakao_connected = True
-        user.email_verified = True
         if not user.display_name:
             user.display_name = profile.get("nickname", email.split("@")[0])
         if not user.avatar_url:

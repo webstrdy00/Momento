@@ -4,7 +4,7 @@ Image Pydantic schemas
 """
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class UserImageBase(BaseModel):
@@ -36,8 +36,9 @@ class UserImageResponse(UserImageBase):
 
 class UploadUrlRequest(BaseModel):
     """업로드 Signed URL 요청"""
-    file_name: str
-    file_type: str  # "image/jpeg", "image/png", etc.
+    file_name: str = Field(..., min_length=1, max_length=255)
+    file_type: str = Field(..., min_length=1, max_length=100)  # "image/jpeg", "image/png", etc.
+    file_size: int = Field(..., ge=1)
 
 
 class UploadUrlResponse(BaseModel):

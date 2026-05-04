@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 class StatsOverview(BaseModel):
     total_watched: int
+    completed_movie_count: int = 0
+    completed_series_count: int = 0
     total_watch_time: int
     average_rating: float
     current_streak: int

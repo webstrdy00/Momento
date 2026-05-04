@@ -1,16 +1,24 @@
 import asyncio
 from urllib.parse import parse_qs, urlparse
 
+import pytest
+from fastapi import HTTPException, status
+
 from app.api.v1.auth import (
     _consume_oauth_state,
     _build_pkce_pair,
+    _ensure_existing_user_can_link_oauth,
+    _ensure_oauth_email_verified,
     _get_oauth_redirect_uri,
+    _is_google_email_verified,
+    _is_kakao_email_verified,
     _oauth_states,
     _render_mobile_oauth_bridge_page,
     _store_oauth_state,
     google_auth_start,
 )
 from app.config import settings
+from app.models.user import User
 
 
 def test_get_oauth_redirect_uri_uses_backend_public_url_for_mobile(monkeypatch) -> None:
@@ -77,3 +85,39 @@ def test_google_auth_start_includes_pkce_parameters() -> None:
     assert len(query["code_challenge"][0]) >= 43
     assert state in _oauth_states
     assert _oauth_states[state]["code_verifier"]
+
+
+def test_oauth_email_verification_flags_are_required() -> None:
+    assert _is_google_email_verified({"email_verified": True}) is True
+    assert _is_google_email_verified({"verified_email": True}) is True
+    assert _is_google_email_verified({"email_verified": False}) is False
+
+    assert (
+        _is_kakao_email_verified(
+            {"is_email_valid": True, "is_email_verified": True}
+        )
+        is True
+    )
+    assert (
+        _is_kakao_email_verified(
+            {"is_email_valid": True, "is_email_verified": False}
+        )
+        is False
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        _ensure_oauth_email_verified("google", False)
+
+    assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_existing_user_must_have_verified_email_before_oauth_auto_link() -> None:
+    unverified_user = User(email="user@example.com", email_verified=False)
+    verified_user = User(email="user@example.com", email_verified=True)
+
+    _ensure_existing_user_can_link_oauth(verified_user, "google")
+
+    with pytest.raises(HTTPException) as exc_info:
+        _ensure_existing_user_can_link_oauth(unverified_user, "google")
+
+    assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN

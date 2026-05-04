@@ -9,7 +9,7 @@ import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack"
 import { COLORS } from "../constants/colors"
 import FilterChip from "../components/FilterChip"
-import type { RootStackParamList, TabParamList, MovieStatus } from "../types"
+import type { ContentType, RootStackParamList, TabParamList, MovieStatus } from "../types"
 import { getMovies } from "../services/movieService"
 
 type MoviesScreenRootNavigationProp = NativeStackNavigationProp<RootStackParamList>
@@ -24,7 +24,7 @@ export default function MoviesScreen() {
   const tabBarHeight = useBottomTabBarHeight()
   const [searchQuery, setSearchQuery] = useState("")
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("")
-  const [selectedFilter, setSelectedFilter] = useState<"all" | MovieStatus>("all")
+  const [selectedFilter, setSelectedFilter] = useState<"all" | MovieStatus | ContentType>("all")
   const [movies, setMovies] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -61,7 +61,7 @@ export default function MoviesScreen() {
     try {
       setLoading(true)
       setError(false)
-      const status = selectedFilter === "all" ? undefined : selectedFilter
+      const status = selectedFilter === "watchlist" || selectedFilter === "watching" || selectedFilter === "completed" ? selectedFilter : undefined
       const data = await getMovies(status)
       setMovies(data)
     } catch (error) {
@@ -79,11 +79,13 @@ export default function MoviesScreen() {
     setRefreshing(false)
   }, [selectedFilter])
 
-  const filters: Array<{ id: "all" | MovieStatus; label: string }> = [
+  const filters: Array<{ id: "all" | MovieStatus | ContentType; label: string }> = [
     { id: "all", label: "전체" },
+    { id: "movie", label: "영화" },
+    { id: "series", label: "시리즈" },
     { id: "watchlist", label: "보고 싶은" },
     { id: "watching", label: "보는 중" },
-    { id: "completed", label: "본 영화" },
+    { id: "completed", label: "감상 완료" },
   ]
 
   // Filter and search logic
@@ -91,7 +93,9 @@ export default function MoviesScreen() {
     let result = movies
 
     // Apply status filter
-    if (selectedFilter !== "all") {
+    if (selectedFilter === "movie" || selectedFilter === "series") {
+      result = result.filter((movie) => (movie.content_type ?? "movie") === selectedFilter)
+    } else if (selectedFilter !== "all") {
       result = result.filter((movie) => movie.status === selectedFilter)
     }
 
@@ -106,9 +110,11 @@ export default function MoviesScreen() {
 
   const getStatusLabel = (status?: string) => {
     if (status === "watching") return "보는 중"
-    if (status === "completed") return "본 영화"
+    if (status === "completed") return "감상 완료"
     return "보고 싶은"
   }
+
+  const getContentTypeLabel = (contentType?: string) => (contentType === "series" ? "시리즈" : "영화")
 
   const getStatusStyle = (status?: string) => {
     if (status === "watching") {
@@ -162,6 +168,10 @@ export default function MoviesScreen() {
             )}
 
             <View style={styles.metaRow}>
+              <View style={styles.contentTypeChip}>
+                <Text style={styles.contentTypeChipText}>{getContentTypeLabel(item.content_type)}</Text>
+              </View>
+
               <View style={[styles.statusChip, statusStyle.chip]}>
                 <Text style={[styles.statusChipText, statusStyle.text]}>
                   {getStatusLabel(item.status)}
@@ -188,7 +198,7 @@ export default function MoviesScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.headerTitle}>내 영화</Text>
+        <Text style={styles.headerTitle}>내 작품</Text>
         <TouchableOpacity onPress={() => rootNavigation.navigate("MovieSearch")}>
           <Ionicons name="add-circle" size={28} color={COLORS.gold} />
         </TouchableOpacity>
@@ -199,7 +209,7 @@ export default function MoviesScreen() {
         <Ionicons name="search" size={20} color={COLORS.lightGray} />
         <TextInput
           style={styles.searchInput}
-          placeholder="영화 검색..."
+          placeholder="작품 검색..."
           placeholderTextColor={COLORS.lightGray}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -222,7 +232,7 @@ export default function MoviesScreen() {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.gold} />
-          <Text style={styles.loadingText}>영화 목록을 불러오는 중...</Text>
+          <Text style={styles.loadingText}>작품 목록을 불러오는 중...</Text>
         </View>
       ) : error ? (
         <View style={styles.loadingContainer}>
@@ -249,9 +259,9 @@ export default function MoviesScreen() {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="film-outline" size={64} color={COLORS.lightGray} />
-              <Text style={styles.emptyTitle}>영화를 찾을 수 없습니다</Text>
+              <Text style={styles.emptyTitle}>작품을 찾을 수 없습니다</Text>
               <Text style={styles.emptySubtitle}>
-                {searchQuery ? "다른 검색어를 시도해보세요" : "영화를 추가해보세요"}
+                {searchQuery ? "다른 검색어를 시도해보세요" : "작품을 추가해보세요"}
               </Text>
             </View>
           }
@@ -344,6 +354,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     marginTop: 8,
+  },
+  contentTypeChip: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  contentTypeChipText: {
+    color: COLORS.lightGray,
+    fontSize: 11,
+    fontWeight: "700",
   },
   statusChip: {
     borderWidth: 1,
