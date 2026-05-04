@@ -26,6 +26,74 @@ from app.services.storage_service import storage_service
 router = APIRouter(prefix="/media", tags=["media"])
 
 ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+UPLOAD_READ_CHUNK_BYTES = 1024 * 1024
+
+
+def _format_file_size(byte_count: int) -> str:
+    if byte_count >= 1024 * 1024:
+        return f"{byte_count // (1024 * 1024)}MB"
+    if byte_count >= 1024:
+        return f"{byte_count // 1024}KB"
+    return f"{byte_count}B"
+
+
+def _validate_image_type(file_type: str | None) -> str:
+    content_type = (file_type or "").lower()
+    if content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"지원하지 않는 파일 형식입니다. 허용: {', '.join(ALLOWED_IMAGE_TYPES)}",
+        )
+
+    return content_type
+
+
+def _validate_image_size(file_size: int) -> None:
+    if file_size > settings.MAX_IMAGE_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                "이미지는 "
+                f"{_format_file_size(settings.MAX_IMAGE_UPLOAD_BYTES)} 이하 파일만 업로드할 수 있습니다."
+            ),
+        )
+
+
+def _validate_image_signature(content: bytes, content_type: str) -> None:
+    signature_checks = {
+        "image/jpeg": lambda data: data.startswith(b"\xff\xd8\xff"),
+        "image/jpg": lambda data: data.startswith(b"\xff\xd8\xff"),
+        "image/png": lambda data: data.startswith(b"\x89PNG\r\n\x1a\n"),
+        "image/webp": lambda data: data.startswith(b"RIFF") and data[8:12] == b"WEBP",
+    }
+    is_valid = signature_checks[content_type](content)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="파일 내용이 이미지 형식과 일치하지 않습니다.",
+        )
+
+
+async def _read_limited_upload_file(file: UploadFile) -> bytes:
+    chunks: list[bytes] = []
+    total_bytes = 0
+
+    while True:
+        chunk = await file.read(UPLOAD_READ_CHUNK_BYTES)
+        if not chunk:
+            break
+
+        total_bytes += len(chunk)
+        _validate_image_size(total_bytes)
+        chunks.append(chunk)
+
+    if total_bytes == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="빈 파일은 업로드할 수 없습니다.",
+        )
+
+    return b"".join(chunks)
 
 
 def _normalize_owned_media_reference(file_reference: str | None, user_id: str, field_label: str) -> str | None:
@@ -66,6 +134,7 @@ async def get_upload_url(
     Args:
         file_name: 파일명 (e.g., 'ticket.jpg')
         file_type: MIME type (e.g., 'image/jpeg')
+        file_size: 파일 크기(bytes)
 
     Returns:
         upload_url: GCS 업로드 URL (PUT 요청용, 15분 유효)
@@ -73,17 +142,13 @@ async def get_upload_url(
         storage_url: DB에 저장할 영구 참조값
         expires_in: URL 유효 시간 (초)
     """
-    # 파일 타입 검증
-    if request.file_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"지원하지 않는 파일 형식입니다. 허용: {', '.join(ALLOWED_IMAGE_TYPES)}"
-        )
+    file_type = _validate_image_type(request.file_type)
+    _validate_image_size(request.file_size)
 
     try:
         result = storage_service.generate_upload_url(
             file_name=request.file_name,
-            file_type=request.file_type,
+            file_type=file_type,
             folder=storage_service.build_user_folder(user_id=user_id),
             expiration=settings.GCP_SIGNED_URL_EXPIRATION_SECONDS,
         )
@@ -100,10 +165,10 @@ async def get_upload_url(
             )
         )
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"업로드 URL 생성 실패: {str(e)}"
+            detail="업로드 URL 생성에 실패했습니다.",
         )
 
 
@@ -118,15 +183,11 @@ async def upload_file_via_backend(
     - 브라우저 CORS 이슈를 피하기 위해 파일을 백엔드로 먼저 업로드
     - 저장 후 즉시 미리보기용 Signed URL과 영구 참조값 반환
     """
-    content_type = (file.content_type or "").lower()
-    if content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"지원하지 않는 파일 형식입니다. 허용: {', '.join(ALLOWED_IMAGE_TYPES)}"
-        )
+    content_type = _validate_image_type(file.content_type)
 
     try:
-        content = await file.read()
+        content = await _read_limited_upload_file(file)
+        _validate_image_signature(content, content_type)
         result = storage_service.upload_bytes(
             file_name=file.filename or f"upload_{user_id}.jpg",
             file_type=content_type,
@@ -143,10 +204,13 @@ async def upload_file_via_backend(
                 storage_url=result["storage_url"],
             ),
         )
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"파일 업로드 실패: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"파일 업로드 실패: {str(e)}"
+            detail="파일 업로드에 실패했습니다.",
         )
 
 

@@ -227,51 +227,35 @@ export default function EditProfileScreen() {
 
       let fileUrl = ""
       let storageUrl = ""
+      const formData = new FormData()
 
       if (Platform.OS === "web") {
         const imageResponse = await fetch(asset.uri)
         const blob = await imageResponse.blob()
-        const formData = new FormData()
-        formData.append("file", blob, fileName)
-
-        const uploadRes = await api.post("/api/v1/media/upload-file", formData)
-
-        const result = unwrapResponse<{
-          file_url: string
-          storage_url: string
-        }>(uploadRes)
-
-        fileUrl = result.file_url
-        storageUrl = result.storage_url
-      } else {
-        // 1. 업로드 Signed URL 받기
-        const presignedRes = await api.post("/api/v1/media/upload", {
-          file_name: fileName,
-          file_type: fileType,
-        })
-        const result = unwrapResponse<{
-          upload_url: string
-          file_url: string
-          storage_url: string
-        }>(presignedRes)
-
-        // 2. GCS에 업로드
-        const imageResponse = await fetch(asset.uri)
-        const blob = await imageResponse.blob()
-        const uploadResponse = await fetch(result.upload_url, {
-          method: "PUT",
-          headers: { "Content-Type": fileType },
-          body: blob,
-        })
-        if (!uploadResponse.ok) {
-          throw new Error(`업로드 실패 (${uploadResponse.status})`)
+        if (blob.size > MAX_AVATAR_FILE_SIZE_BYTES) {
+          showAlert("알림", "프로필 이미지는 5MB 이하 파일만 업로드할 수 있습니다.")
+          return
         }
-
-        fileUrl = result.file_url
-        storageUrl = result.storage_url
+        formData.append("file", blob.type ? blob : blob.slice(0, blob.size, fileType), fileName)
+      } else {
+        formData.append("file", {
+          uri: asset.uri,
+          name: fileName,
+          type: fileType,
+        } as any)
       }
 
-      // 3. avatar_url 업데이트
+      const uploadRes = await api.post("/api/v1/media/upload-file", formData)
+
+      const result = unwrapResponse<{
+        file_url: string
+        storage_url: string
+      }>(uploadRes)
+
+      fileUrl = result.file_url
+      storageUrl = result.storage_url
+
+      // avatar_url 업데이트
       setAvatarUrl(fileUrl)
       setAvatarStorageUrl(storageUrl)
     } catch (error) {
@@ -466,7 +450,7 @@ export default function EditProfileScreen() {
 
           {/* 연간 목표 */}
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>연간 관람 목표</Text>
+            <Text style={styles.fieldLabel}>연간 감상 목표</Text>
             <View style={styles.goalRow}>
               <TextInput
                 style={[styles.textInput, styles.goalInput]}
@@ -478,9 +462,9 @@ export default function EditProfileScreen() {
                 maxLength={3}
                 returnKeyType="done"
               />
-              <Text style={styles.goalUnit}>편</Text>
+              <Text style={styles.goalUnit}>작품</Text>
             </View>
-            <Text style={styles.fieldHint}>{`올해 목표 관람 횟수를 설정하세요 (${YEARLY_GOAL_MIN}~${YEARLY_GOAL_MAX})`}</Text>
+            <Text style={styles.fieldHint}>{`올해 목표 감상 작품 수를 설정하세요 (${YEARLY_GOAL_MIN}~${YEARLY_GOAL_MAX})`}</Text>
           </View>
         </View>
 

@@ -26,6 +26,8 @@ class UserMovie(Base):
 
     # 진행률 (watching 상태일 때)
     progress = Column(Integer, default=0)
+    current_season = Column(Integer)
+    current_episode = Column(Integer)
 
     # 메타데이터
     created_at = Column(TIMESTAMP, server_default=func.now(), index=True)

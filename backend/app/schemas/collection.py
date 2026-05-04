@@ -54,6 +54,8 @@ class SimpleMovieInCollection(BaseModel):
     rating: Optional[float] = None
     year: Optional[int] = None
     status: Optional[str] = None
+    content_type: str = "movie"
+    release_channel: str = "unknown"
 
 
 class CollectionWithMovies(CollectionResponse):

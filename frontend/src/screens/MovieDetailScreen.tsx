@@ -21,6 +21,24 @@ import { useAlert } from "../components/CustomAlert"
 
 type MovieDetailScreenProps = NativeStackScreenProps<RootStackParamList, "MovieDetail">
 type MovieStatus = "watching" | "completed" | "watchlist"
+type ContentType = "movie" | "series"
+type ReleaseChannel = "theatrical" | "ott_original" | "tv" | "unknown"
+
+const CONTENT_TYPE_OPTIONS: Array<{ value: ContentType; label: string }> = [
+  { value: "movie", label: "영화" },
+  { value: "series", label: "시리즈" },
+]
+
+const RELEASE_CHANNEL_OPTIONS: Array<{ value: ReleaseChannel; label: string }> = [
+  { value: "theatrical", label: "극장 개봉" },
+  { value: "ott_original", label: "OTT 오리지널" },
+  { value: "tv", label: "TV/방송" },
+  { value: "unknown", label: "알 수 없음" },
+]
+
+const getContentTypeLabel = (value?: string | null) => (value === "series" ? "시리즈" : "영화")
+const getReleaseChannelLabel = (value?: string | null) =>
+  RELEASE_CHANNEL_OPTIONS.find((option) => option.value === value)?.label ?? "알 수 없음"
 
 const STATUS_CARD_THEME = {
   surface: COLORS.deepGray,
@@ -62,6 +80,9 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
   const [showProgressModal, setShowProgressModal] = useState(false)
   const [pendingProgress, setPendingProgress] = useState("")
   const [pendingRuntime, setPendingRuntime] = useState("")
+  const [pendingSeason, setPendingSeason] = useState("")
+  const [pendingEpisode, setPendingEpisode] = useState("")
+  const [pendingTotalEpisodes, setPendingTotalEpisodes] = useState("")
   const [pendingRating, setPendingRating] = useState(0)
   const [pendingReview, setPendingReview] = useState("")
 
@@ -89,7 +110,7 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
       setAllTags(tagsData)
     } catch (error) {
       console.error("MovieDetailScreen 데이터 로드 실패:", error)
-      showAlert("오류", "영화 정보를 불러오지 못했습니다.")
+      showAlert("오류", "작품 정보를 불러오지 못했습니다.")
       navigation.goBack()
     } finally {
       setLoading(false)
@@ -152,10 +173,10 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
     try {
       setIsDeleting(true)
       await deleteMovie(id)
-      showAlert("삭제 완료", "영화가 삭제되었습니다.")
+      showAlert("삭제 완료", "작품이 삭제되었습니다.")
       navigation.goBack()
     } catch (error) {
-      console.error("영화 삭제 실패:", error)
+      console.error("작품 삭제 실패:", error)
       showAlert("오류", "삭제에 실패했습니다.")
     } finally {
       setIsDeleting(false)
@@ -166,7 +187,7 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
     if (isDeleting) return
     setShowActionMenu(false)
 
-    showAlert("영화 삭제", "정말 이 영화를 삭제하시겠습니까?", [
+    showAlert("작품 삭제", "정말 이 작품을 삭제하시겠습니까?", [
       { text: "취소", style: "cancel" },
       { text: "삭제", style: "destructive", onPress: () => void executeDelete() },
     ])
@@ -230,24 +251,65 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
       setMovie(updatedMovie)
       setIsBestMovie(updatedMovie.is_best_movie || false)
     } catch (error) {
-      console.error("인생 영화 토글 실패:", error)
+      console.error("인생 작품 토글 실패:", error)
       setIsBestMovie(!nextValue)
-      showAlert("오류", "인생 영화 설정에 실패했습니다.")
+      showAlert("오류", "인생 작품 설정에 실패했습니다.")
     } finally {
       setIsSaving(false)
     }
   }, [id, isBestMovie, isSaving])
 
+  const isSeries = (movie?.content_type ?? "movie") === "series"
+
   const openProgressModal = () => {
     setPendingProgress(String(watchingProgressMinutes || ""))
     setPendingRuntime(String(watchingRuntimeMinutes || ""))
+    setPendingSeason(String(movie?.current_season || 1))
+    setPendingEpisode(String(movie?.current_episode || ""))
+    setPendingTotalEpisodes(String(movie?.total_episodes || ""))
     setShowProgressModal(true)
   }
 
   const handleSaveProgress = async () => {
+    if (isSeries) {
+      const season = parseInt(pendingSeason, 10)
+      const episode = parseInt(pendingEpisode, 10)
+      const totalEpisodes = parseInt(pendingTotalEpisodes, 10)
+
+      if (pendingSeason.trim() && (isNaN(season) || season < 0)) {
+        showAlert("알림", "올바른 시즌 번호를 입력해주세요.")
+        return
+      }
+      if (pendingEpisode.trim() && (isNaN(episode) || episode < 0)) {
+        showAlert("알림", "올바른 회차 번호를 입력해주세요.")
+        return
+      }
+      if (pendingTotalEpisodes.trim() && (isNaN(totalEpisodes) || totalEpisodes < 0)) {
+        showAlert("알림", "올바른 전체 회차를 입력해주세요.")
+        return
+      }
+
+      setShowProgressModal(false)
+      try {
+        setIsSaving(true)
+        const payload: any = {}
+        if (pendingSeason.trim()) payload.current_season = season
+        if (pendingEpisode.trim()) payload.current_episode = episode
+        if (pendingTotalEpisodes.trim()) payload.total_episodes = totalEpisodes
+        const updatedMovie = await updateMovie(id, payload)
+        setMovie(updatedMovie)
+      } catch (error) {
+        console.error("회차 진행률 저장 실패:", error)
+        showAlert("오류", "회차 진행률 저장에 실패했습니다.")
+      } finally {
+        setIsSaving(false)
+      }
+      return
+    }
+
     const minutes = parseInt(pendingProgress, 10)
     if (pendingProgress.trim() && (isNaN(minutes) || minutes < 0)) {
-      showAlert("알림", "올바른 시청 시간(분)을 입력해주세요.")
+      showAlert("알림", "올바른 감상 시간(분)을 입력해주세요.")
       return
     }
     const runtimeVal = parseInt(pendingRuntime, 10)
@@ -288,6 +350,20 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
       console.error("장르 저장 실패:", error)
       setGenreList(movie?.genre ? movie.genre.split(",").map((g: string) => g.trim()).filter(Boolean) : [])
       showAlert("오류", "장르 저장에 실패했습니다.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const persistMovieMetadata = async (payload: { content_type?: ContentType; release_channel?: ReleaseChannel; total_episodes?: number }) => {
+    if (isSaving) return
+    try {
+      setIsSaving(true)
+      const updatedMovie = await updateMovie(id, payload)
+      setMovie(updatedMovie)
+    } catch (error) {
+      console.error("작품 정보 저장 실패:", error)
+      showAlert("오류", "작품 정보 저장에 실패했습니다.")
     } finally {
       setIsSaving(false)
     }
@@ -459,7 +535,7 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
       setStatus(prev.status)
       setRating(prev.rating)
       setReview(prev.review)
-      showAlert("오류", "시청 완료 저장에 실패했습니다.")
+      showAlert("오류", "감상 완료 저장에 실패했습니다.")
     }
   }
 
@@ -497,16 +573,37 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
 
   const watchingProgressMinutes = Math.max(0, Number(movie?.progress || 0))
   const watchingRuntimeMinutes = Math.max(0, Number(movie?.runtime || 0))
-  const watchingProgressPercent = watchingRuntimeMinutes > 0 ? Math.min(100, (watchingProgressMinutes / watchingRuntimeMinutes) * 100) : 0
-  const watchingProgressLabel = watchingRuntimeMinutes > 0 ? `${Math.round(watchingProgressPercent)}% 진행` : "상영시간 정보 없음"
+  const currentSeason = Math.max(1, Number(movie?.current_season || 1))
+  const currentEpisode = Math.max(0, Number(movie?.current_episode || 0))
+  const totalEpisodes = Math.max(0, Number(movie?.total_episodes || 0))
+  const movieProgressPercent = watchingRuntimeMinutes > 0 ? Math.min(100, (watchingProgressMinutes / watchingRuntimeMinutes) * 100) : 0
+  const seriesProgressPercent = totalEpisodes > 0 ? Math.min(100, (currentEpisode / totalEpisodes) * 100) : 0
+  const watchingProgressPercent = isSeries ? seriesProgressPercent : movieProgressPercent
+  const watchingProgressLabel = isSeries
+    ? totalEpisodes > 0
+      ? `시즌 ${currentSeason} · ${currentEpisode}/${totalEpisodes}화`
+      : `시즌 ${currentSeason} · ${currentEpisode}화까지 감상`
+    : watchingRuntimeMinutes > 0
+      ? `${Math.round(watchingProgressPercent)}% 진행`
+      : "상영시간 정보 없음"
 
   const directorText = typeof movie?.director === "string" && movie.director.trim().length > 0 ? movie.director.trim() : "감독 정보 없음"
 
   const releaseText = (() => {
     const releaseDate = formatKoreanDate(movie?.release_date)
-    if (releaseDate) return `${releaseDate} 개봉`
-    if (movie?.year) return `${movie.year}년 개봉`
-    return "개봉 정보 없음"
+    const channel = movie?.release_channel
+    if (releaseDate) {
+      if (channel === "ott_original") return `${releaseDate} OTT 공개`
+      if (channel === "tv") return `${releaseDate} 방송`
+      return `${releaseDate} 개봉`
+    }
+    if (movie?.year) {
+      if (channel === "ott_original") return `${movie.year}년 OTT 공개`
+      if (channel === "tv") return `${movie.year}년 방송`
+      if (channel === "theatrical") return `${movie.year}년 극장 개봉`
+      return `${movie.year}년 공개`
+    }
+    return "공개 정보 없음"
   })()
 
   const synopsisText = typeof movie?.synopsis === "string" && movie.synopsis.trim().length > 0 ? movie.synopsis.trim() : "줄거리 정보가 아직 등록되지 않았어요."
@@ -525,7 +622,7 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
     }
 
     if (status === "completed") {
-      items.push({ label: "다시 시청", icon: "refresh-outline", onPress: () => openStartDateModal() })
+      items.push({ label: "다시 감상", icon: "refresh-outline", onPress: () => openStartDateModal() })
       items.push({ label: "보고 싶음", icon: "bookmark-outline", onPress: () => void handleQuickStatusChange("watchlist") })
     }
 
@@ -537,7 +634,7 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
     return (
       <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
         <ActivityIndicator size="large" color={COLORS.gold} />
-        <Text style={{ color: COLORS.lightGray, marginTop: 12 }}>영화 정보를 불러오는 중...</Text>
+        <Text style={{ color: COLORS.lightGray, marginTop: 12 }}>작품 정보를 불러오는 중...</Text>
       </View>
     )
   }
@@ -563,6 +660,14 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
           <Image source={{ uri: movie.poster_url }} style={styles.poster} />
           <View style={styles.movieInfo}>
             <Text style={styles.title}>{movie.title}</Text>
+            <View style={styles.heroBadgeRow}>
+              <View style={styles.heroBadge}>
+                <Text style={styles.heroBadgeText}>{getContentTypeLabel(movie.content_type)}</Text>
+              </View>
+              <View style={styles.heroBadge}>
+                <Text style={styles.heroBadgeText}>{getReleaseChannelLabel(movie.release_channel)}</Text>
+              </View>
+            </View>
             <View style={styles.infoRow}>
               <Ionicons name="person-outline" size={14} color={COLORS.lightGray} />
               <Text style={styles.infoText}>{directorText}</Text>
@@ -582,6 +687,43 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
       </LinearGradient>
 
       <View style={styles.content}>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>작품 정보</Text>
+          <Text style={styles.metaControlLabel}>작품 형식</Text>
+          <View style={styles.metaOptionRow}>
+            {CONTENT_TYPE_OPTIONS.map((option) => {
+              const selected = (movie.content_type ?? "movie") === option.value
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.metaOptionChip, selected && styles.metaOptionChipSelected]}
+                  onPress={() => void persistMovieMetadata({ content_type: option.value })}
+                  disabled={isSaving || selected}
+                >
+                  <Text style={[styles.metaOptionChipText, selected && styles.metaOptionChipTextSelected]}>{option.label}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+
+          <Text style={styles.metaControlLabel}>공개 방식</Text>
+          <View style={styles.metaOptionRow}>
+            {RELEASE_CHANNEL_OPTIONS.map((option) => {
+              const selected = (movie.release_channel ?? "unknown") === option.value
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.metaOptionChip, selected && styles.metaOptionChipSelected]}
+                  onPress={() => void persistMovieMetadata({ release_channel: option.value })}
+                  disabled={isSaving || selected}
+                >
+                  <Text style={[styles.metaOptionChipText, selected && styles.metaOptionChipTextSelected]}>{option.label}</Text>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        </View>
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>줄거리</Text>
@@ -681,8 +823,8 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
           <View style={styles.statusSection}>
             <TouchableOpacity style={[styles.startWatchingCard, isSaving && styles.disabledButton]} onPress={() => openStartDateModal()} disabled={isSaving}>
               <View style={styles.startWatchingCardTextWrap}>
-                <Text style={styles.startWatchingCardTitle}>시청 시작</Text>
-                <Text style={styles.startWatchingCardDescription}>시작 날짜를 선택해서 시청 기록을 남겨보세요.</Text>
+              <Text style={styles.startWatchingCardTitle}>감상 시작</Text>
+              <Text style={styles.startWatchingCardDescription}>시작 날짜를 선택해서 감상 기록을 남겨보세요.</Text>
               </View>
               <View style={styles.startWatchingCardIconCircle}>
                 <Ionicons name="play" size={18} color={COLORS.darkNavy} />
@@ -694,14 +836,14 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
         {status === "watching" && (
           <View style={styles.statusSection}>
             <View style={styles.timelineCard}>
-              {/* 상단 노드: 시청 시작 + 날짜 */}
+              {/* 상단 노드: 감상 시작 + 날짜 */}
               <TouchableOpacity style={styles.timelineRow} onPress={() => openStartDateModal(movie.watch_date)} disabled={isSaving}>
                 <View style={styles.timelineNodeColumn}>
                   <View style={styles.timelineLineBelowNode} />
                   <View style={styles.timelineNodeFilled} />
                 </View>
                 <View style={styles.timelineContent}>
-                  <Text style={styles.timelineNodeLabel}>시청 시작</Text>
+                  <Text style={styles.timelineNodeLabel}>감상 시작</Text>
                   <Text style={styles.timelineNodeDate}>{movie.watch_date ? formatKoreanDate(movie.watch_date) : "-"}</Text>
                 </View>
               </TouchableOpacity>
@@ -716,18 +858,18 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
                     <View style={[styles.timelineProgressBarFill, { width: `${watchingProgressPercent}%` }]} />
                   </View>
                   <Text style={styles.timelineProgressLabel}>{watchingProgressLabel}</Text>
-                  <Text style={styles.timelineDaysLabel}>{daysElapsed ?? 1}일째 시청 중</Text>
+                  <Text style={styles.timelineDaysLabel}>{daysElapsed ?? 1}일째 감상 중</Text>
                 </View>
               </TouchableOpacity>
 
-              {/* 하단 노드: 시청 완료 */}
+              {/* 하단 노드: 감상 완료 */}
               <TouchableOpacity style={styles.timelineCompleteRow} onPress={openCompleteModal} disabled={isSaving}>
                 <View style={[styles.timelineNodeColumn, styles.timelineNodeColumnBottom]}>
                   <View style={styles.timelineLineAboveNode} />
                   <View style={styles.timelineNodeEmpty} />
                 </View>
                 <View style={styles.timelineCompleteContent}>
-                  <Text style={styles.timelineNodeLabel}>시청 완료</Text>
+                  <Text style={styles.timelineNodeLabel}>감상 완료</Text>
                 </View>
                 <Text style={styles.timelineCompleteAction}>완료 기록하기 →</Text>
               </TouchableOpacity>
@@ -742,7 +884,7 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
               <View style={styles.completedHeader}>
                 <View style={styles.completedBadge}>
                   <Ionicons name="checkmark-circle" size={16} color={COLORS.gold} />
-                  <Text style={styles.completedBadgeText}>시청 완료</Text>
+                  <Text style={styles.completedBadgeText}>감상 완료</Text>
                 </View>
                 {movie.watch_date && <Text style={styles.completedDateText}>{formatKoreanDate(movie.watch_date)}</Text>}
               </View>
@@ -766,10 +908,10 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
               {/* 감상평 */}
               <TextInput style={styles.reviewInput} placeholder="감상평을 입력해 주세요" placeholderTextColor={COLORS.lightGray} multiline numberOfLines={4} value={review} onChangeText={setReview} onBlur={() => void handleCompletedReviewBlur()} editable={!isSaving} />
 
-              {/* 다시 시청하기 */}
+              {/* 다시 감상하기 */}
               <TouchableOpacity style={[styles.rewatchButton, isSaving && styles.disabledButton]} onPress={() => openStartDateModal()} disabled={isSaving}>
                 <Ionicons name="refresh-outline" size={16} color={COLORS.gold} />
-                <Text style={styles.rewatchButtonText}>다시 시청하기</Text>
+                <Text style={styles.rewatchButtonText}>다시 감상하기</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -798,8 +940,8 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
         <View style={styles.centeredBackdrop}>
           <TouchableOpacity style={styles.modalDismissLayer} activeOpacity={1} onPress={() => setShowStartDateModal(false)} />
           <View style={styles.dateModalCard}>
-            <Text style={styles.modalTitle}>시청 시작일</Text>
-            <Text style={styles.modalSubtitle}>시청 시작 날짜를 선택해 주세요.</Text>
+            <Text style={styles.modalTitle}>감상 시작일</Text>
+            <Text style={styles.modalSubtitle}>감상 시작 날짜를 선택해 주세요.</Text>
 
             <View style={styles.calendarHeader}>
               <TouchableOpacity style={styles.calendarMonthButton} onPress={handlePickerPrev}><Ionicons name="chevron-back" size={18} color={COLORS.lightGray} /></TouchableOpacity>
@@ -873,7 +1015,7 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
         <View style={styles.centeredBackdrop}>
           <TouchableOpacity style={styles.modalDismissLayer} activeOpacity={1} onPress={() => setShowCompleteModal(false)} />
           <View style={styles.completeModalCard}>
-            <Text style={styles.modalTitle}>시청 완료 기록</Text>
+            <Text style={styles.modalTitle}>감상 완료 기록</Text>
             <Text style={styles.modalSubtitle}>별점과 감상평을 입력한 뒤 완료 상태로 변경됩니다.</Text>
 
             <View style={styles.ratingContainer}>
@@ -903,37 +1045,88 @@ export default function MovieDetailScreen({ route, navigation }: MovieDetailScre
         <View style={styles.centeredBackdrop}>
           <TouchableOpacity style={styles.modalDismissLayer} activeOpacity={1} onPress={() => setShowProgressModal(false)} />
           <View style={styles.dateModalCard}>
-            <Text style={styles.modalTitle}>시청 진행 시간</Text>
-            <Text style={styles.modalSubtitle}>시청 시간과 총 상영시간을 입력해 주세요.</Text>
+            <Text style={styles.modalTitle}>{isSeries ? "시리즈 진행률" : "감상 진행 시간"}</Text>
+            <Text style={styles.modalSubtitle}>
+              {isSeries ? "현재 시즌과 회차를 입력해 주세요." : "감상 시간과 총 상영시간을 입력해 주세요."}
+            </Text>
 
-            <Text style={styles.progressFieldLabel}>현재 시청 시간</Text>
-            <View style={styles.progressInputRow}>
-              <TextInput
-                style={styles.progressInput}
-                value={pendingProgress}
-                onChangeText={(text) => setPendingProgress(text.replace(/[^0-9]/g, ""))}
-                placeholder="0"
-                placeholderTextColor={COLORS.lightGray}
-                keyboardType="number-pad"
-                maxLength={4}
-                autoFocus
-              />
-              <Text style={styles.progressInputUnit}>분</Text>
-            </View>
+            {isSeries ? (
+              <>
+                <Text style={styles.progressFieldLabel}>현재 시즌</Text>
+                <View style={styles.progressInputRow}>
+                  <TextInput
+                    style={styles.progressInput}
+                    value={pendingSeason}
+                    onChangeText={(text) => setPendingSeason(text.replace(/[^0-9]/g, ""))}
+                    placeholder="1"
+                    placeholderTextColor={COLORS.lightGray}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    autoFocus
+                  />
+                  <Text style={styles.progressInputUnit}>시즌</Text>
+                </View>
 
-            <Text style={styles.progressFieldLabel}>총 상영시간</Text>
-            <View style={styles.progressInputRow}>
-              <TextInput
-                style={styles.progressInput}
-                value={pendingRuntime}
-                onChangeText={(text) => setPendingRuntime(text.replace(/[^0-9]/g, ""))}
-                placeholder="0"
-                placeholderTextColor={COLORS.lightGray}
-                keyboardType="number-pad"
-                maxLength={4}
-              />
-              <Text style={styles.progressInputUnit}>분</Text>
-            </View>
+                <Text style={styles.progressFieldLabel}>현재 회차</Text>
+                <View style={styles.progressInputRow}>
+                  <TextInput
+                    style={styles.progressInput}
+                    value={pendingEpisode}
+                    onChangeText={(text) => setPendingEpisode(text.replace(/[^0-9]/g, ""))}
+                    placeholder="0"
+                    placeholderTextColor={COLORS.lightGray}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                  />
+                  <Text style={styles.progressInputUnit}>화</Text>
+                </View>
+
+                <Text style={styles.progressFieldLabel}>전체 회차</Text>
+                <View style={styles.progressInputRow}>
+                  <TextInput
+                    style={styles.progressInput}
+                    value={pendingTotalEpisodes}
+                    onChangeText={(text) => setPendingTotalEpisodes(text.replace(/[^0-9]/g, ""))}
+                    placeholder="0"
+                    placeholderTextColor={COLORS.lightGray}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                  />
+                  <Text style={styles.progressInputUnit}>화</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.progressFieldLabel}>현재 감상 시간</Text>
+                <View style={styles.progressInputRow}>
+                  <TextInput
+                    style={styles.progressInput}
+                    value={pendingProgress}
+                    onChangeText={(text) => setPendingProgress(text.replace(/[^0-9]/g, ""))}
+                    placeholder="0"
+                    placeholderTextColor={COLORS.lightGray}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                    autoFocus
+                  />
+                  <Text style={styles.progressInputUnit}>분</Text>
+                </View>
+
+                <Text style={styles.progressFieldLabel}>총 상영시간</Text>
+                <View style={styles.progressInputRow}>
+                  <TextInput
+                    style={styles.progressInput}
+                    value={pendingRuntime}
+                    onChangeText={(text) => setPendingRuntime(text.replace(/[^0-9]/g, ""))}
+                    placeholder="0"
+                    placeholderTextColor={COLORS.lightGray}
+                    keyboardType="number-pad"
+                    maxLength={4}
+                  />
+                  <Text style={styles.progressInputUnit}>분</Text>
+                </View>
+              </>
+            )}
 
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalCancelButton} onPress={() => setShowProgressModal(false)}><Text style={styles.modalCancelButtonText}>취소</Text></TouchableOpacity>
@@ -971,6 +1164,9 @@ const styles = StyleSheet.create({
   poster: { width: 120, height: 180, borderRadius: 12, borderWidth: 3, borderColor: COLORS.gold },
   movieInfo: { flex: 1, marginLeft: 16, justifyContent: "center" },
   title: { fontSize: 22, fontWeight: "bold", color: COLORS.white, marginBottom: 10 },
+  heroBadgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10 },
+  heroBadge: { borderRadius: 999, backgroundColor: "rgba(212,175,55,0.16)", paddingHorizontal: 9, paddingVertical: 4 },
+  heroBadgeText: { color: COLORS.gold, fontSize: 11, fontWeight: "800" },
   infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 6, gap: 6 },
   infoText: { fontSize: 14, color: COLORS.lightGray },
   content: { paddingHorizontal: 16, paddingTop: 16 },
@@ -979,6 +1175,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: "rgba(255, 255, 255, 0.08)",
   },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: COLORS.white, marginBottom: 10 },
+  metaControlLabel: { color: COLORS.lightGray, fontSize: 12, fontWeight: "700", marginBottom: 8 },
+  metaOptionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
+  metaOptionChip: {
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.14)", borderRadius: 999,
+    backgroundColor: COLORS.deepGray, paddingHorizontal: 12, paddingVertical: 8,
+  },
+  metaOptionChipSelected: { borderColor: COLORS.gold, backgroundColor: COLORS.gold },
+  metaOptionChipText: { color: COLORS.lightGray, fontSize: 12, fontWeight: "700" },
+  metaOptionChipTextSelected: { color: COLORS.darkNavy },
   synopsis: { fontSize: 14, color: COLORS.lightGray, lineHeight: 22 },
   tagsContainer: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   tag: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.deepGray, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },

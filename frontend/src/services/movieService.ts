@@ -11,6 +11,11 @@ export interface UserMovieCreate {
   one_line_review?: string;
   watch_date?: string;
   progress?: number;
+  current_season?: number;
+  current_episode?: number;
+  watch_method?: 'theater' | 'ott' | 'tv' | 'other';
+  watch_location?: string;
+  watched_with?: string;
   is_best_movie?: boolean;
 }
 
@@ -20,9 +25,17 @@ export interface UserMovieUpdate {
   one_line_review?: string;
   watch_date?: string;
   progress?: number;
+  current_season?: number;
+  current_episode?: number;
+  watch_method?: 'theater' | 'ott' | 'tv' | 'other';
+  watch_location?: string;
+  watched_with?: string;
   is_best_movie?: boolean;
   genre?: string;
   runtime?: number;
+  content_type?: 'movie' | 'series';
+  release_channel?: 'theatrical' | 'ott_original' | 'tv' | 'unknown';
+  total_episodes?: number;
 }
 
 export interface MovieSearchParams {
@@ -32,9 +45,12 @@ export interface MovieSearchParams {
 export interface MovieMetadata {
   title: string;
   original_title?: string | null;
+  content_type?: 'movie' | 'series';
+  release_channel?: 'theatrical' | 'ott_original' | 'tv' | 'unknown';
   director?: string | null;
   year?: number | null;
   runtime?: number | null;
+  total_episodes?: number | null;
   genre?: string | null;
   poster_url?: string | null;
   backdrop_url?: string | null;
@@ -46,19 +62,27 @@ export interface MovieMetadata {
 
 const normalizeMovie = (movie: any) => ({
   ...movie,
-  poster: movie?.poster ?? movie?.poster_url ?? null,
+  poster: movie?.poster ?? movie?.poster_url ?? movie?.backdrop_url ?? movie?.backdrop ?? null,
   backdrop: movie?.backdrop ?? movie?.backdrop_url ?? null,
-  poster_url: movie?.poster_url ?? movie?.poster ?? null,
+  poster_url: movie?.poster_url ?? movie?.poster ?? movie?.backdrop_url ?? movie?.backdrop ?? null,
   backdrop_url: movie?.backdrop_url ?? movie?.backdrop ?? null,
   review: movie?.review ?? movie?.one_line_review ?? '',
+  content_type: movie?.content_type ?? 'movie',
+  release_channel: movie?.release_channel ?? 'unknown',
+  total_episodes: movie?.total_episodes ?? null,
+  current_season: movie?.current_season ?? null,
+  current_episode: movie?.current_episode ?? null,
 });
 
 // ===========================
 // API Functions
 // ===========================
 
-export const getMovies = async (status?: string) => {
-  const params = status ? { status } : {};
+export const getMovies = async (
+  status?: string,
+  filters?: { content_type?: 'movie' | 'series'; release_channel?: 'theatrical' | 'ott_original' | 'tv' | 'unknown' }
+) => {
+  const params = { ...(status ? { status } : {}), ...(filters ?? {}) };
   const response = await api.get('/api/v1/movies/', { params });
   return unwrapResponse<any[]>(response).map(normalizeMovie);
 };
@@ -90,7 +114,7 @@ export const searchMovies = async (query: string) => {
   return unwrapResponse<any[]>(response);
 };
 
-export const getMovieMetadata = async (source: 'kobis' | 'tmdb', movieId: string | number) => {
+export const getMovieMetadata = async (source: 'kobis' | 'tmdb' | 'tmdb_tv', movieId: string | number) => {
   const response = await api.get(`/api/v1/movies/metadata/${source}/${movieId}`);
   return unwrapResponse<MovieMetadata>(response);
 };

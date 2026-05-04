@@ -91,7 +91,7 @@ export default function CollectionsScreen() {
                 </View>
                 <View style={styles.cardInfo}>
                   <Text style={styles.cardName} numberOfLines={1}>{collection.name}</Text>
-                  <Text style={styles.cardCount}>{collection.movie_count}편</Text>
+                  <Text style={styles.cardCount}>{collection.movie_count}작품</Text>
                   {collection.description ? (
                     <Text style={styles.cardDesc} numberOfLines={2}>{collection.description}</Text>
                   ) : null}
@@ -104,7 +104,7 @@ export default function CollectionsScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="sparkles" size={48} color={COLORS.lightGray} />
             <Text style={styles.emptyText}>컬렉션이 없습니다</Text>
-            <Text style={styles.emptySubtext}>영화를 기록하면 자동으로 컬렉션이 생성됩니다</Text>
+            <Text style={styles.emptySubtext}>작품을 기록하면 자동으로 컬렉션이 생성됩니다</Text>
           </View>
         )}
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, extract, text
+from sqlalchemy import case, func, extract, text
 from datetime import datetime, date, timedelta
 from typing import List
 from app.database import get_db
@@ -51,6 +51,28 @@ async def get_user_stats(
         .scalar() or 0
     )
 
+    completed_movie_count = (
+        db.query(func.count(UserMovie.id))
+        .join(Movie, UserMovie.movie_id == Movie.id)
+        .filter(
+            UserMovie.user_id == user_id,
+            UserMovie.status == "completed",
+            Movie.movie_type == "movie",
+        )
+        .scalar() or 0
+    )
+
+    completed_series_count = (
+        db.query(func.count(UserMovie.id))
+        .join(Movie, UserMovie.movie_id == Movie.id)
+        .filter(
+            UserMovie.user_id == user_id,
+            UserMovie.status == "completed",
+            Movie.movie_type == "series",
+        )
+        .scalar() or 0
+    )
+
     # watch_date가 비어있는 레거시 데이터는 created_at 날짜로 보정
     watch_day_expr = func.coalesce(UserMovie.watch_date, func.date(UserMovie.created_at))
 
@@ -76,9 +98,16 @@ async def get_user_stats(
         .scalar() or 0
     )
 
-    # Total watch time
+    # Total watch time. 시리즈는 회차 수가 있을 때 에피소드 단위로 계산한다.
+    watch_time_expr = case(
+        (
+            Movie.movie_type == "series",
+            func.coalesce(Movie.runtime, 0) * func.coalesce(Movie.total_episodes, 1),
+        ),
+        else_=func.coalesce(Movie.runtime, 0),
+    )
     total_watch_time = (
-        db.query(func.sum(Movie.runtime))
+        db.query(func.sum(watch_time_expr))
         .join(UserMovie, UserMovie.movie_id == Movie.id)
         .filter(
             UserMovie.user_id == user_id,
@@ -96,6 +125,8 @@ async def get_user_stats(
 
     stats_data = StatsOverview(
         total_watched=total_watched,
+        completed_movie_count=completed_movie_count,
+        completed_series_count=completed_series_count,
         total_watch_time=int(total_watch_time),
         average_rating=round(float(avg_rating), 2) if avg_rating else 0.0,
         current_streak=current_streak,

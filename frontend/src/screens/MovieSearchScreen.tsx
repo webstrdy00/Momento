@@ -33,9 +33,12 @@ type MovieSearchScreenNavigationProp = NativeStackNavigationProp<RootStackParamL
 interface MovieSearchItem {
   title: string
   original_title?: string | null
+  content_type?: "movie" | "series"
+  release_channel?: "theatrical" | "ott_original" | "tv" | "unknown"
   director?: string | null
   year?: number | null
   runtime?: number | null
+  total_episodes?: number | null
   genre?: string | null
   poster_url?: string | null
   backdrop_url?: string | null
@@ -49,6 +52,7 @@ interface MovieSearchItem {
 interface LibraryMovieIdentity {
   title?: string | null
   original_title?: string | null
+  content_type?: "movie" | "series"
   year?: number | null
   kobis_code?: string | null
   tmdb_id?: number | null
@@ -58,9 +62,12 @@ interface LibraryMovieIdentity {
 interface MovieDraft {
   title: string
   original_title: string
+  content_type: "movie" | "series"
+  release_channel: "theatrical" | "ott_original" | "tv" | "unknown"
   director: string
   year: string
   runtime: string
+  total_episodes: string
   genre: string
   synopsis: string
   poster_url: string
@@ -79,12 +86,12 @@ const normalizeSearchText = (value?: string | null) =>
     .replace(/[\p{P}\p{S}\s_]+/gu, "")
 
 const buildFallbackKey = (movie: Partial<MovieSearchItem>) =>
-  `${normalizeSearchText(movie.title)}::${normalizeSearchText(movie.original_title)}::${movie.year ?? "na"}`
+  `${movie.content_type ?? "movie"}::${normalizeSearchText(movie.title)}::${normalizeSearchText(movie.original_title)}::${movie.year ?? "na"}`
 
 const getMovieIdentityKeys = (movie: Partial<MovieSearchItem>) => {
   const keys: string[] = []
 
-  if (movie.tmdb_id) keys.push(`tmdb:${movie.tmdb_id}`)
+  if (movie.tmdb_id) keys.push(`tmdb:${movie.content_type ?? "movie"}:${movie.tmdb_id}`)
   if (movie.kobis_code) keys.push(`kobis:${movie.kobis_code}`)
   if (movie.kmdb_id) keys.push(`kmdb:${movie.kmdb_id}`)
   keys.push(`fallback:${buildFallbackKey(movie)}`)
@@ -118,12 +125,36 @@ const parseOptionalInt = (value: string) => {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
+const CONTENT_TYPE_OPTIONS = [
+  { value: "movie" as const, label: "영화" },
+  { value: "series" as const, label: "시리즈" },
+]
+
+const RELEASE_CHANNEL_OPTIONS = [
+  { value: "theatrical" as const, label: "극장 개봉" },
+  { value: "ott_original" as const, label: "OTT 오리지널" },
+  { value: "tv" as const, label: "TV/방송" },
+  { value: "unknown" as const, label: "알 수 없음" },
+]
+
+const getContentTypeLabel = (value?: string | null) =>
+  value === "series" ? "시리즈" : "영화"
+
+const getReleaseChannelLabel = (value?: string | null) =>
+  RELEASE_CHANNEL_OPTIONS.find((option) => option.value === value)?.label ?? "알 수 없음"
+
+const getDisplayImageUrl = (item: { poster_url?: string | null; backdrop_url?: string | null }) =>
+  item.poster_url || item.backdrop_url || null
+
 const createDraftFromItem = (movie: MovieSearchItem): MovieDraft => ({
   title: movie.title ?? "",
   original_title: movie.original_title ?? "",
+  content_type: movie.content_type ?? "movie",
+  release_channel: movie.release_channel ?? "unknown",
   director: movie.director ?? "",
   year: movie.year ? String(movie.year) : "",
   runtime: movie.runtime ? String(movie.runtime) : "",
+  total_episodes: movie.total_episodes ? String(movie.total_episodes) : "",
   genre: movie.genre ?? "",
   synopsis: movie.synopsis ?? "",
   poster_url: movie.poster_url ?? "",
@@ -138,9 +169,12 @@ const mergeMovieItemWithMetadata = (movie: MovieSearchItem, metadata: MovieMetad
   ...movie,
   title: metadata.title ?? movie.title,
   original_title: metadata.original_title ?? movie.original_title,
+  content_type: metadata.content_type ?? movie.content_type ?? "movie",
+  release_channel: metadata.release_channel ?? movie.release_channel ?? "unknown",
   director: metadata.director ?? movie.director,
   year: metadata.year ?? movie.year,
   runtime: metadata.runtime ?? movie.runtime,
+  total_episodes: metadata.total_episodes ?? movie.total_episodes,
   genre: metadata.genre ?? movie.genre,
   poster_url: metadata.poster_url ?? movie.poster_url,
   backdrop_url: metadata.backdrop_url ?? movie.backdrop_url,
@@ -192,6 +226,7 @@ export default function MovieSearchScreen() {
           const identityCandidate: Partial<MovieSearchItem> = {
             title: movie.title ?? undefined,
             original_title: movie.original_title ?? undefined,
+            content_type: movie.content_type ?? "movie",
             year: movie.year ?? undefined,
             kobis_code: movie.kobis_code ?? undefined,
             tmdb_id: movie.tmdb_id ?? undefined,
@@ -262,7 +297,7 @@ export default function MovieSearchScreen() {
   }, [])
 
   const showAlreadyAddedNotice = useCallback(() => {
-    showToast("보관함에 있는 영화에요.")
+    showToast("보관함에 있는 작품이에요.")
   }, [showToast])
 
   const loadTags = useCallback(async () => {
@@ -336,13 +371,14 @@ export default function MovieSearchScreen() {
 
     const title = draft.title.trim()
     if (!title) {
-      showAlert("입력 확인", "영화 제목을 입력해 주세요.")
+      showAlert("입력 확인", "작품 제목을 입력해 주세요.")
       return
     }
 
     const duplicateCandidate: Partial<MovieSearchItem> = {
       title,
       original_title: toOptionalString(draft.original_title),
+      content_type: draft.content_type,
       year: parseOptionalInt(draft.year),
       kobis_code: toOptionalString(draft.kobis_code),
       tmdb_id: draft.tmdb_id ?? undefined,
@@ -360,9 +396,12 @@ export default function MovieSearchScreen() {
       const metadataPayload: Partial<MovieSearchItem> = {
         title,
         original_title: toOptionalString(draft.original_title),
+        content_type: draft.content_type,
+        release_channel: draft.release_channel,
         director: toOptionalString(draft.director),
         year: parseOptionalInt(draft.year),
         runtime: parseOptionalInt(draft.runtime),
+        total_episodes: draft.content_type === "series" ? parseOptionalInt(draft.total_episodes) : undefined,
         genre: toOptionalString(draft.genre),
         synopsis: toOptionalString(draft.synopsis),
         poster_url: toOptionalString(draft.poster_url),
@@ -391,9 +430,9 @@ export default function MovieSearchScreen() {
       handleBackFromEditor(true)
 
       if (failedTagCount > 0) {
-        showAlert("일부 저장됨", `영화는 추가했지만 태그 ${failedTagCount}개 추가에 실패했어요.`)
+        showAlert("일부 저장됨", `작품은 추가했지만 태그 ${failedTagCount}개 추가에 실패했어요.`)
       } else {
-        showAlert("추가 완료", "보고 싶은 영화에 추가했어요.")
+        showAlert("추가 완료", "보고 싶은 작품에 추가했어요.")
       }
     } catch (error: any) {
       console.error("영화 추가 실패:", error)
@@ -404,7 +443,7 @@ export default function MovieSearchScreen() {
         handleBackFromEditor(true)
         showAlreadyAddedNotice()
       } else {
-        showAlert("오류", "영화 추가에 실패했습니다.")
+        showAlert("오류", "작품 추가에 실패했습니다.")
       }
     } finally {
       setIsSaving(false)
@@ -415,6 +454,7 @@ export default function MovieSearchScreen() {
     const alreadyAdded = isMovieAdded(item)
     const isPreparing = preparingMovieKey === getPrimaryMovieIdentityKey(item)
     const isSelectionLocked = Boolean(preparingMovieKey)
+    const imageUrl = getDisplayImageUrl(item)
 
     return (
       <TouchableOpacity
@@ -429,8 +469,8 @@ export default function MovieSearchScreen() {
         activeOpacity={0.85}
         disabled={isSelectionLocked}
       >
-        {item.poster_url ? (
-          <Image source={{ uri: item.poster_url }} style={styles.poster} />
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={styles.poster} />
         ) : (
           <View style={[styles.poster, styles.posterFallback]}>
             <Ionicons name="image-outline" size={20} color={COLORS.lightGray} />
@@ -447,6 +487,14 @@ export default function MovieSearchScreen() {
             </Text>
           )}
           <View style={styles.metadata}>
+            <View style={styles.resultChipRow}>
+              <View style={styles.resultMetaChip}>
+                <Text style={styles.resultMetaChipText}>{getContentTypeLabel(item.content_type)}</Text>
+              </View>
+              <View style={styles.resultMetaChip}>
+                <Text style={styles.resultMetaChipText}>{getReleaseChannelLabel(item.release_channel)}</Text>
+              </View>
+            </View>
             {item.year && <Text style={styles.metadataText}>{item.year}</Text>}
             {item.genre ? <Text style={styles.metadataText}>{item.genre}</Text> : null}
             {item.director && item.director !== "Unknown" ? (
@@ -477,7 +525,7 @@ export default function MovieSearchScreen() {
         <Ionicons name="search" size={20} color={COLORS.lightGray} />
         <TextInput
           style={styles.searchInput}
-          placeholder="영화 제목으로 검색..."
+          placeholder="작품 제목으로 검색..."
           placeholderTextColor={COLORS.lightGray}
           value={searchQuery}
           onChangeText={(text) => {
@@ -516,7 +564,7 @@ export default function MovieSearchScreen() {
       {!hasSearched ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="search" size={64} color={COLORS.lightGray} />
-          <Text style={styles.emptyTitle}>영화를 검색해보세요</Text>
+          <Text style={styles.emptyTitle}>작품을 검색해보세요</Text>
           <Text style={styles.emptySubtitle}>제목이나 제목+연도로 찾으면 더 정확해요</Text>
         </View>
       ) : loading ? (
@@ -528,7 +576,7 @@ export default function MovieSearchScreen() {
         <View style={styles.emptyContainer}>
           <Ionicons name="film-outline" size={64} color={COLORS.lightGray} />
           <Text style={styles.emptyTitle}>검색 결과가 없습니다</Text>
-          <Text style={styles.emptySubtitle}>영화 제목 위주로 다시 검색해보세요</Text>
+          <Text style={styles.emptySubtitle}>작품 제목 위주로 다시 검색해보세요</Text>
         </View>
       ) : (
         <FlatList
@@ -556,8 +604,8 @@ export default function MovieSearchScreen() {
     return (
       <ScrollView style={styles.editorContainer} contentContainerStyle={styles.editorContent}>
         <View style={styles.editorTopCard}>
-          {draft.poster_url ? (
-            <Image source={{ uri: draft.poster_url }} style={styles.editorPoster} />
+          {getDisplayImageUrl(draft) ? (
+            <Image source={{ uri: getDisplayImageUrl(draft)! }} style={styles.editorPoster} />
           ) : (
             <View style={[styles.editorPoster, styles.posterFallback]}>
               <Ionicons name="image-outline" size={20} color={COLORS.lightGray} />
@@ -567,6 +615,9 @@ export default function MovieSearchScreen() {
             <Text style={styles.editorTopTitle} numberOfLines={2}>
               {draft.title || "제목 없음"}
             </Text>
+            <Text style={styles.editorTopMeta}>
+              {getContentTypeLabel(draft.content_type)} · {getReleaseChannelLabel(draft.release_channel)}
+            </Text>
           </View>
         </View>
 
@@ -574,12 +625,48 @@ export default function MovieSearchScreen() {
           <Text style={styles.editorSectionTitle}>기본정보</Text>
 
           <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>작품 형식</Text>
+            <View style={styles.optionGrid}>
+              {CONTENT_TYPE_OPTIONS.map((option) => {
+                const selected = draft.content_type === option.value
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[styles.optionChip, selected && styles.optionChipSelected]}
+                    onPress={() => updateDraftField("content_type", option.value)}
+                  >
+                    <Text style={[styles.optionChipText, selected && styles.optionChipTextSelected]}>{option.label}</Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>공개 방식</Text>
+            <View style={styles.optionGrid}>
+              {RELEASE_CHANNEL_OPTIONS.map((option) => {
+                const selected = draft.release_channel === option.value
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[styles.optionChip, selected && styles.optionChipSelected]}
+                    onPress={() => updateDraftField("release_channel", option.value)}
+                  >
+                    <Text style={[styles.optionChipText, selected && styles.optionChipTextSelected]}>{option.label}</Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>제목</Text>
             <TextInput
               style={styles.input}
               value={draft.title}
               onChangeText={(text) => updateDraftField("title", text)}
-              placeholder="영화 제목"
+              placeholder="작품 제목"
               placeholderTextColor={COLORS.lightGray}
             />
           </View>
@@ -621,7 +708,7 @@ export default function MovieSearchScreen() {
 
           <View style={styles.inputRow}>
             <View style={[styles.inputGroup, styles.inputHalf]}>
-              <Text style={styles.inputLabel}>상영시간(분)</Text>
+              <Text style={styles.inputLabel}>{draft.content_type === "series" ? "회당 시간(분)" : "상영시간(분)"}</Text>
               <TextInput
                 style={styles.input}
                 value={draft.runtime}
@@ -642,6 +729,20 @@ export default function MovieSearchScreen() {
               />
             </View>
           </View>
+
+          {draft.content_type === "series" && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>전체 회차</Text>
+              <TextInput
+                style={styles.input}
+                value={draft.total_episodes}
+                onChangeText={(text) => updateDraftField("total_episodes", text.replace(/[^0-9]/g, ""))}
+                placeholder="예: 8"
+                placeholderTextColor={COLORS.lightGray}
+                keyboardType="number-pad"
+              />
+            </View>
+          )}
         </View>
 
         <View style={styles.editorSection}>
@@ -688,7 +789,7 @@ export default function MovieSearchScreen() {
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>{selectedMovie ? "영화 등록하기" : "영화 검색"}</Text>
+        <Text style={styles.headerTitle}>{selectedMovie ? "작품 등록하기" : "작품 검색"}</Text>
 
         {selectedMovie ? (
           <TouchableOpacity
@@ -864,6 +965,23 @@ const styles = StyleSheet.create({
   metadata: {
     gap: 2,
   },
+  resultChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 2,
+  },
+  resultMetaChip: {
+    borderRadius: 999,
+    backgroundColor: "rgba(212, 175, 55, 0.12)",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  resultMetaChipText: {
+    color: COLORS.gold,
+    fontSize: 10,
+    fontWeight: "700",
+  },
   metadataText: {
     fontSize: 12,
     color: COLORS.lightGray,
@@ -921,6 +1039,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: COLORS.white,
   },
+  editorTopMeta: {
+    fontSize: 12,
+    color: COLORS.gold,
+    fontWeight: "700",
+  },
   editorSection: {
     backgroundColor: COLORS.deepGray,
     borderRadius: 14,
@@ -945,6 +1068,31 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 12,
     color: COLORS.lightGray,
+  },
+  optionGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  optionChip: {
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: COLORS.darkGray,
+  },
+  optionChipSelected: {
+    borderColor: COLORS.gold,
+    backgroundColor: COLORS.gold,
+  },
+  optionChipText: {
+    color: COLORS.lightGray,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  optionChipTextSelected: {
+    color: COLORS.darkNavy,
   },
   input: {
     borderWidth: 1,

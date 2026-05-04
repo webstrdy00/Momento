@@ -10,23 +10,32 @@ import type { NavigatorScreenParams } from "@react-navigation/native"
 // ============================================
 
 export type MovieStatus = "watchlist" | "watching" | "completed"
+export type ContentType = "movie" | "series"
+export type ReleaseChannel = "theatrical" | "ott_original" | "tv" | "unknown"
+export type WatchMethod = "theater" | "ott" | "tv" | "other"
 
 export interface Movie {
   id: number
   title: string
   original_title?: string
+  content_type?: ContentType
+  release_channel?: ReleaseChannel
   poster?: string
   poster_url: string
   backdrop?: string
   backdrop_url?: string
   year?: number
   runtime?: number // minutes
+  total_episodes?: number
   genre?: string
   director?: string
   synopsis?: string
   rating?: number // 0-5 (0.5 단위)
   status: MovieStatus
   watch_date?: Date | string
+  watch_method?: WatchMethod
+  current_season?: number
+  current_episode?: number
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -37,7 +46,7 @@ export interface MovieDetail extends Movie {
   detailed_review?: string
   tags?: string[]
   watch_location?: string
-  watch_method?: "theater" | "ott" | "tv" | "other"
+  watch_method?: WatchMethod
   watched_with?: string
   is_best_movie?: boolean
   progress?: number // minutes watched (for status: "watching")
@@ -84,6 +93,8 @@ export interface TagStat {
 
 export interface UserStats {
   total_watched: number
+  completed_movie_count?: number
+  completed_series_count?: number
   total_watch_time: number // minutes
   average_rating: number
   current_streak: number // days
@@ -214,7 +225,7 @@ export interface MovieFormData {
   detailed_review?: string
   watch_date?: Date
   watch_location?: string
-  watch_method?: "theater" | "ott" | "tv" | "other"
+  watch_method?: WatchMethod
   watched_with?: string
   is_best_movie?: boolean
   tags?: string[]

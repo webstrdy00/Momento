@@ -25,6 +25,8 @@ export interface AutoCollectionRules {
   genre?: string;
   director?: string;
   is_best_movie?: boolean;
+  content_type?: 'movie' | 'series';
+  release_channel?: 'theatrical' | 'ott_original' | 'tv' | 'unknown';
   watch_date_from?: string; // ISO 8601
   watch_date_to?: string; // ISO 8601
 }
@@ -49,6 +51,8 @@ export interface CollectionDetail extends Collection {
     rating?: number;
     year?: number;
     status?: string;
+    content_type?: 'movie' | 'series';
+    release_channel?: 'theatrical' | 'ott_original' | 'tv' | 'unknown';
   }>;
 }
 

@@ -6,6 +6,8 @@ import api, { unwrapResponse } from '../lib/api';
 
 export interface OverallStats {
   total_watched: number;
+  completed_movie_count: number;
+  completed_series_count: number;
   total_watch_time: number;
   average_rating: number;
   current_streak: number;
