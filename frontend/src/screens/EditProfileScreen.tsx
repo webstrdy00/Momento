@@ -65,6 +65,10 @@ export default function EditProfileScreen() {
   const getErrorMessage = (error: unknown, fallback: string) => {
     if (!isAxiosError(error)) return fallback
 
+    if (error.code === "ECONNABORTED") {
+      return "요청 시간이 초과되었습니다. 네트워크 상태를 확인하고 다시 시도해주세요."
+    }
+
     if (!error.response) {
       return "네트워크 연결을 확인하고 다시 시도해주세요."
     }
@@ -245,7 +249,9 @@ export default function EditProfileScreen() {
         } as any)
       }
 
-      const uploadRes = await api.post("/api/v1/media/upload-file", formData)
+      const uploadRes = await api.post("/api/v1/media/upload-file", formData, {
+        timeout: 30000,
+      })
 
       const result = unwrapResponse<{
         file_url: string

@@ -10,6 +10,7 @@ import {
   handleGoogleCallback,
   handleKakaoCallback,
   clearTokens,
+  isAuthSessionUnavailableError,
 } from '../services/authService';
 
 interface AuthContextType {
@@ -175,7 +176,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await finishLoading();
       } catch (error) {
         console.error('❌ initAuth 실패:', error);
-        if (mounted) {
+        if (mounted && !isAuthSessionUnavailableError(error)) {
           await clearTokens();
         }
         await finishLoading();
@@ -239,8 +240,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const refreshUser = async () => {
-    const currentUser = await getCurrentUser();
-    setUser(currentUser);
+    try {
+      const currentUser = await getCurrentUser();
+      setUser(currentUser);
+    } catch (error) {
+      if (isAuthSessionUnavailableError(error)) {
+        console.error('❌ 사용자 새로고침 실패:', error);
+        return;
+      }
+
+      throw error;
+    }
   };
 
   return (

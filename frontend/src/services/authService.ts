@@ -3,6 +3,7 @@
  * 자체 JWT 인증 서비스
  */
 import api from '../lib/api';
+import { isAxiosError } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
@@ -44,6 +45,26 @@ export interface LoginRequest {
   email: string;
   password: string;
 }
+
+export class AuthSessionUnavailableError extends Error {
+  originalError: unknown;
+
+  constructor(originalError: unknown) {
+    super('인증 상태를 확인할 수 없습니다.');
+    this.name = 'AuthSessionUnavailableError';
+    this.originalError = originalError;
+    Object.setPrototypeOf(this, AuthSessionUnavailableError.prototype);
+  }
+}
+
+export const isAuthSessionUnavailableError = (
+  error: unknown
+): error is AuthSessionUnavailableError => error instanceof AuthSessionUnavailableError;
+
+const isAuthSessionInvalidError = (error: unknown) => {
+  if (!isAxiosError(error)) return false;
+  return error.response?.status === 401 || error.response?.status === 404;
+};
 
 // ===========================
 // Token Storage
@@ -177,6 +198,10 @@ export const getCurrentUser = async (): Promise<AuthUser | null> => {
     const response = await api.get(`${AUTH_BASE}/me`);
     return response.data.data as AuthUser;
   } catch (error) {
+    if (!isAuthSessionInvalidError(error)) {
+      throw new AuthSessionUnavailableError(error);
+    }
+
     return null;
   }
 };

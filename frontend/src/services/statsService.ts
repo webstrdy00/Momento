@@ -51,7 +51,7 @@ export interface BestMovie {
  * 전체 통계 조회
  */
 export const getOverallStats = async (year?: number): Promise<OverallStats> => {
-  const response = await api.get('/api/v1/stats', {
+  const response = await api.get('/api/v1/stats/', {
     params: typeof year === 'number' ? { year } : undefined,
   });
   return unwrapResponse<OverallStats>(response);

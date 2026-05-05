@@ -70,7 +70,7 @@ export interface SyncResult {
  * 컬렉션 목록 조회
  */
 export const getCollections = async (): Promise<Collection[]> => {
-  const response = await api.get('/api/v1/collections');
+  const response = await api.get('/api/v1/collections/');
   return unwrapResponse<Collection[]>(response);
 };
 
@@ -88,7 +88,7 @@ export const getCollectionDetail = async (collectionId: number): Promise<Collect
  * @param data - 컬렉션 생성 데이터
  */
 export const createCollection = async (data: CollectionCreate): Promise<Collection> => {
-  const response = await api.post('/api/v1/collections', data);
+  const response = await api.post('/api/v1/collections/', data);
   return unwrapResponse<Collection>(response);
 };
 

@@ -88,16 +88,28 @@ export const setOnUnauthorized = (callback: () => void) => {
 // ===========================
 // Token Refresh 상태 관리
 // ===========================
-let isRefreshing = false;
-let refreshSubscribers: ((token: string) => void)[] = [];
+type TokenRefreshSubscriber = {
+  resolve: (token: string) => void;
+  reject: (error: unknown) => void;
+};
 
-const subscribeTokenRefresh = (callback: (token: string) => void) => {
-  refreshSubscribers.push(callback);
+let isRefreshing = false;
+let refreshSubscribers: TokenRefreshSubscriber[] = [];
+
+const subscribeTokenRefresh = (subscriber: TokenRefreshSubscriber) => {
+  refreshSubscribers.push(subscriber);
 };
 
 const onTokenRefreshed = (token: string) => {
-  refreshSubscribers.forEach((callback) => callback(token));
+  const subscribers = refreshSubscribers;
   refreshSubscribers = [];
+  subscribers.forEach(({ resolve }) => resolve(token));
+};
+
+const onTokenRefreshFailed = (error: unknown) => {
+  const subscribers = refreshSubscribers;
+  refreshSubscribers = [];
+  subscribers.forEach(({ reject }) => reject(error));
 };
 
 // ===========================
@@ -125,15 +137,6 @@ api.interceptors.request.use(
     if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
       if (config.headers && 'Content-Type' in config.headers) {
         delete (config.headers as any)['Content-Type'];
-      }
-    }
-
-    // FastAPI trailing slash 처리
-    if (config.url && !config.url.match(/\/\d+/) && !config.url.endsWith('/')) {
-      const specialPaths = ['/search', '/metadata', '/from-metadata', '/sync', '/popular', '/monthly', '/genres', '/best-movies', '/me', '/tags', '/callback', '/auth', '/streak', '/calendar', '/settings'];
-      const hasSpecialPath = specialPaths.some(path => config.url!.includes(path));
-      if (!hasSpecialPath) {
-        config.url = config.url + '/';
       }
     }
 
@@ -186,12 +189,15 @@ api.interceptors.response.use(
 
       // 이미 갱신 중이면 대기
       if (isRefreshing) {
-        return new Promise((resolve) => {
-          subscribeTokenRefresh((token: string) => {
-            const headers = originalRequest.headers ?? {};
-            headers.Authorization = `Bearer ${token}`;
-            originalRequest.headers = headers;
-            resolve(api(originalRequest));
+        return new Promise((resolve, reject) => {
+          subscribeTokenRefresh({
+            resolve: (token: string) => {
+              const headers = originalRequest.headers ?? {};
+              headers.Authorization = `Bearer ${token}`;
+              originalRequest.headers = headers;
+              resolve(api(originalRequest));
+            },
+            reject,
           });
         });
       }
@@ -203,11 +209,7 @@ api.interceptors.response.use(
         const refreshToken = await getRefreshToken();
 
         if (!refreshToken) {
-          await clearTokens();
-          if (onUnauthorized) {
-            onUnauthorized();
-          }
-          return Promise.reject(error);
+          throw error;
         }
 
         // 토큰 갱신 요청
@@ -221,7 +223,6 @@ api.interceptors.response.use(
 
         await saveTokens(access_token, refresh_token);
 
-        isRefreshing = false;
         onTokenRefreshed(access_token);
 
         // 원래 요청 재시도
@@ -230,7 +231,7 @@ api.interceptors.response.use(
         originalRequest.headers = headers;
         return api(originalRequest);
       } catch (refreshError) {
-        isRefreshing = false;
+        onTokenRefreshFailed(refreshError);
 
         console.log('🔒 토큰 갱신 실패 - 로그아웃');
         await clearTokens();
@@ -240,6 +241,8 @@ api.interceptors.response.use(
         }
 
         return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
       }
     }
 

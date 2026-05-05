@@ -25,12 +25,6 @@ export interface UserUpdate {
   yearly_goal?: number;
 }
 
-export interface UserCreate {
-  email: string;
-  display_name?: string;
-  avatar_url?: string;
-}
-
 // ===========================
 // API Functions
 // ===========================
@@ -49,15 +43,6 @@ export const getCurrentUser = async (): Promise<User> => {
  */
 export const updateUserProfile = async (data: UserUpdate): Promise<User> => {
   const response = await api.put('/api/v1/users/me', data);
-  return unwrapResponse<User>(response);
-};
-
-/**
- * 사용자 생성 (Webhook용 또는 자동 생성)
- * @param data - 사용자 생성 데이터
- */
-export const createUser = async (data: UserCreate): Promise<User> => {
-  const response = await api.post('/api/v1/users', data);
   return unwrapResponse<User>(response);
 };
 
