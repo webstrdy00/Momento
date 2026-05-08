@@ -10,9 +10,9 @@ from pydantic import BaseModel, Field
 class UserImageBase(BaseModel):
     """UserImage 기본 스키마"""
     user_movie_id: int
-    image_type: str  # "ticket" or "photocard"
-    image_url: str
-    thumbnail_url: Optional[str] = None
+    image_type: str = Field(..., pattern="^(ticket|photocard|other)$", max_length=20)
+    image_url: str = Field(..., min_length=1, max_length=4096)
+    thumbnail_url: Optional[str] = Field(None, max_length=4096)
 
 
 class UserImageCreate(UserImageBase):

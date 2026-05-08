@@ -89,6 +89,16 @@ def normalize_status_output(status: Optional[str]) -> Optional[str]:
     return status
 
 
+def parse_external_numeric_id(raw_id: str, source: str) -> int:
+    try:
+        return int(raw_id)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{source} ID는 숫자여야 합니다.",
+        )
+
+
 @router.get("/", response_model=BaseResponse[List[FlatMovieResponse]])
 async def get_user_movies(
     status: Optional[str] = Query(None, description="Filter by status: watchlist, watching, completed"),
@@ -136,7 +146,7 @@ async def get_user_movies(
 
 @router.get("/search", response_model=BaseResponse[List[MovieSearchResult]])
 async def search_movies(
-    q: str = Query(..., description="Search query"),
+    q: str = Query(..., min_length=1, max_length=100, description="Search query"),
     user_id: str = Depends(get_current_user),
 ):
     """
@@ -411,8 +421,8 @@ async def delete_movie(
 
 @router.get("/metadata/{source}/{id}", response_model=BaseResponse[MovieMetadata])
 async def get_movie_metadata(
-    source: str = Path(..., description="Source: 'kobis', 'tmdb', or 'tmdb_tv'"),
-    id: str = Path(..., description="Movie ID (kobis_code or tmdb_id)"),
+    source: str = Path(..., pattern="^(kobis|tmdb|tmdb_tv)$", description="Source: 'kobis', 'tmdb', or 'tmdb_tv'"),
+    id: str = Path(..., min_length=1, max_length=100, description="Movie ID (kobis_code or tmdb_id)"),
     user_id: str = Depends(get_current_user),
 ):
     """
@@ -426,9 +436,9 @@ async def get_movie_metadata(
     - Detailed movie metadata
     """
     if source == "tmdb":
-        metadata = await external_api_service.get_tmdb_metadata(int(id))
+        metadata = await external_api_service.get_tmdb_metadata(parse_external_numeric_id(id, "TMDb"))
     elif source == "tmdb_tv":
-        metadata = await external_api_service.get_tmdb_tv_metadata(int(id))
+        metadata = await external_api_service.get_tmdb_tv_metadata(parse_external_numeric_id(id, "TMDb TV"))
     elif source == "kobis":
         metadata = await external_api_service.get_kobis_metadata(id)
     else:

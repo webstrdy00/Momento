@@ -524,8 +524,12 @@ class ExternalAPIService:
 
     def _merge_metadata_candidates(self, candidates: List[Tuple[str, MovieMetadata]]) -> MovieMetadata:
         """여러 소스의 메타데이터를 필드별 우선순위에 따라 합친다."""
-        merged = MovieMetadata(title="")
-        field_sources: Dict[str, str] = {}
+        initial_title = next(
+            (metadata.title for _, metadata in candidates if metadata.title),
+            "제목 없음",
+        )
+        merged = MovieMetadata(title=initial_title)
+        field_sources: Dict[str, str] = {"title": candidates[0][0]} if candidates else {}
 
         for candidate_source, candidate_metadata in candidates:
             for field_name in self.SEARCH_MERGE_FIELDS:

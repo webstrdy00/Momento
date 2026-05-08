@@ -156,6 +156,8 @@ class AutoCollectionService:
         if not collection.auto_rules:
             raise ValueError(f"Collection auto_rules is empty: {collection_id}")
 
+        AutoCollectionService.validate_auto_rule(collection.auto_rules)
+
         # 규칙에 맞는 영화 찾기
         matching_movies = AutoCollectionService._find_matching_movies(
             user_id=collection.user_id,
@@ -333,10 +335,18 @@ class AutoCollectionService:
         if "rating" in rules:
             rating = rules["rating"]
             if isinstance(rating, dict):
+                if "min" in rating and not isinstance(rating["min"], (int, float)):
+                    raise ValueError("rating.min must be a number")
+                if "max" in rating and not isinstance(rating["max"], (int, float)):
+                    raise ValueError("rating.max must be a number")
                 if "min" in rating and not (0 <= rating["min"] <= 5):
                     raise ValueError("rating.min must be between 0 and 5")
                 if "max" in rating and not (0 <= rating["max"] <= 5):
                     raise ValueError("rating.max must be between 0 and 5")
+                if "min" in rating and "max" in rating and rating["min"] > rating["max"]:
+                    raise ValueError("rating.min must be less than or equal to rating.max")
+            elif not isinstance(rating, (int, float)):
+                raise ValueError("rating must be a number")
             elif not (0 <= rating <= 5):
                 raise ValueError("rating must be between 0 and 5")
 
@@ -344,12 +354,28 @@ class AutoCollectionService:
         if "year" in rules:
             year = rules["year"]
             if isinstance(year, dict):
+                if "min" in year and not isinstance(year["min"], int):
+                    raise ValueError("year.min must be an integer")
+                if "max" in year and not isinstance(year["max"], int):
+                    raise ValueError("year.max must be an integer")
                 if "min" in year and not (1900 <= year["min"] <= 2100):
                     raise ValueError("year.min must be between 1900 and 2100")
                 if "max" in year and not (1900 <= year["max"] <= 2100):
                     raise ValueError("year.max must be between 1900 and 2100")
+                if "min" in year and "max" in year and year["min"] > year["max"]:
+                    raise ValueError("year.min must be less than or equal to year.max")
+            elif not isinstance(year, int):
+                raise ValueError("year must be an integer")
             elif not (1900 <= year <= 2100):
                 raise ValueError("year must be between 1900 and 2100")
+
+        for text_field in ("genre", "director"):
+            if text_field in rules:
+                value = rules[text_field]
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError(f"{text_field} must be a non-empty string")
+                if len(value) > 255:
+                    raise ValueError(f"{text_field} must be 255 characters or fewer")
 
         # is_best_movie 검증
         if "is_best_movie" in rules:
@@ -363,6 +389,28 @@ class AutoCollectionService:
         if "release_channel" in rules:
             if rules["release_channel"] not in ["theatrical", "ott_original", "tv", "unknown"]:
                 raise ValueError(f"Invalid release_channel: {rules['release_channel']}")
+
+        if "watch_date" in rules:
+            watch_date = rules["watch_date"]
+            if not isinstance(watch_date, dict):
+                raise ValueError("watch_date must be an object")
+            if "min" not in watch_date and "max" not in watch_date:
+                raise ValueError("watch_date must include min or max")
+
+            parsed_dates = {}
+            for key in ("min", "max"):
+                if key not in watch_date:
+                    continue
+                value = watch_date[key]
+                if not isinstance(value, str):
+                    raise ValueError(f"watch_date.{key} must be an ISO date string")
+                try:
+                    parsed_dates[key] = datetime.fromisoformat(value).date()
+                except ValueError:
+                    raise ValueError(f"watch_date.{key} must be an ISO date string")
+
+            if "min" in parsed_dates and "max" in parsed_dates and parsed_dates["min"] > parsed_dates["max"]:
+                raise ValueError("watch_date.min must be less than or equal to watch_date.max")
 
         return True
 

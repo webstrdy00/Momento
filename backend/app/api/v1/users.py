@@ -9,7 +9,7 @@ from app.database import get_db
 from app.middleware.auth_middleware import get_current_user_id
 from app.models.user import User
 from app.models.user_image import UserImage
-from app.schemas.user import UserResponse, UserUpdate
+from app.schemas.user import UserDeleteRequest, UserResponse, UserUpdate
 from app.schemas.common import BaseResponse
 from app.services.response_serializers import serialize_user
 from app.services.storage_service import storage_service
@@ -105,6 +105,7 @@ async def update_current_user(
 
 @router.delete("/me", response_model=BaseResponse[dict])
 async def delete_current_user(
+    delete_request: UserDeleteRequest,
     user_id: str = Depends(get_current_user_id),
     db: Session = Depends(get_db)
 ):

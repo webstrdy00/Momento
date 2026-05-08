@@ -5,10 +5,17 @@ from uuid import uuid4
 import jwt
 import pytest
 from fastapi import HTTPException, status
+from pydantic import ValidationError
 
 from app.api.v1.auth import _get_client_ip
 from app.api.v1.media import _validate_image_signature, _validate_image_size
+from app.api.v1.movies import parse_external_numeric_id
 from app.config import get_jwt_secret_key, settings
+from app.schemas.collection import CollectionCreate
+from app.schemas.movie import UserMovieCreate
+from app.schemas.tag import TagCreate
+from app.schemas.user import UserDeleteRequest
+from app.services.auto_collection_service import auto_collection_service
 from app.services.auth_service import (
     create_access_token,
     create_refresh_token,
@@ -97,3 +104,44 @@ def test_image_signature_must_match_declared_type() -> None:
         _validate_image_signature(b"\x89PNG\r\n\x1a\nsample", "image/jpeg")
 
     assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_external_numeric_id_rejects_non_numeric_value() -> None:
+    assert parse_external_numeric_id("12345", "TMDb") == 12345
+
+    with pytest.raises(HTTPException) as exc_info:
+        parse_external_numeric_id("abc", "TMDb")
+
+    assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_request_schemas_reject_unbounded_user_input() -> None:
+    with pytest.raises(ValidationError):
+        CollectionCreate(name="x" * 101)
+
+    with pytest.raises(ValidationError):
+        TagCreate(name="   ")
+
+    with pytest.raises(ValidationError):
+        UserMovieCreate(
+            movie_id=1,
+            status="completed",
+            one_line_review="x" * 2001,
+        )
+
+    with pytest.raises(ValidationError):
+        UserDeleteRequest(confirmation_text="delete")
+
+    assert UserDeleteRequest(confirmation_text="회원탈퇴").confirmation_text == "회원탈퇴"
+
+
+def test_auto_collection_rule_validation_rejects_bad_types() -> None:
+    with pytest.raises(ValueError, match="rating.min must be a number"):
+        auto_collection_service.validate_auto_rule(
+            {"status": "completed", "rating": {"min": "4"}}
+        )
+
+    with pytest.raises(ValueError, match="watch_date.min must be an ISO date string"):
+        auto_collection_service.validate_auto_rule(
+            {"status": "completed", "watch_date": {"min": "not-a-date"}}
+        )

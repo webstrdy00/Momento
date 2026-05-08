@@ -300,7 +300,7 @@ export default function EditProfileScreen() {
     if (deleteConfirmText !== "회원탈퇴") return
     try {
       setIsDeleting(true)
-      await deleteUser()
+      await deleteUser(deleteConfirmText)
       setShowDeleteModal(false)
       setDeleteConfirmText("")
       showAlert("탈퇴 완료", "회원 탈퇴가 완료되었습니다.", [

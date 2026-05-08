@@ -5,7 +5,7 @@ Collection Pydantic schemas
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING, List
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 if TYPE_CHECKING:
     from .movie import MovieResponse
@@ -13,11 +13,19 @@ if TYPE_CHECKING:
 
 class CollectionBase(BaseModel):
     """Collection 기본 스키마"""
-    name: str
-    description: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=1000)
     is_auto: bool = False  # True: 자동 수집, False: 수동 수집
-    cover_image_url: Optional[str] = None
+    cover_image_url: Optional[str] = Field(None, max_length=500)
     auto_rules: Optional[dict] = None  # JSONB - 자동 수집 규칙
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("컬렉션 이름은 공백만 입력할 수 없습니다.")
+        return stripped
 
 
 class CollectionCreate(CollectionBase):
@@ -27,10 +35,21 @@ class CollectionCreate(CollectionBase):
 
 class CollectionUpdate(BaseModel):
     """Collection 업데이트 스키마"""
-    name: Optional[str] = None
-    description: Optional[str] = None
-    cover_image_url: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=1000)
+    cover_image_url: Optional[str] = Field(None, max_length=500)
     auto_rules: Optional[dict] = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("컬렉션 이름은 공백만 입력할 수 없습니다.")
+        return stripped
 
 
 class CollectionResponse(CollectionBase):

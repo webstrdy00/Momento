@@ -23,8 +23,9 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="Movie tracking app API with self-hosted JWT authentication",
     version=settings.APP_VERSION,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    openapi_url="/openapi.json" if settings.DEBUG else None,
+    docs_url="/docs" if settings.DEBUG else None,
+    redoc_url="/redoc" if settings.DEBUG else None,
     lifespan=lifespan,
 )
 

@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     AUTH_LOGIN_ATTEMPT_WINDOW_SECONDS: int = 600
     AUTH_REGISTER_ATTEMPT_LIMIT: int = 5
     AUTH_REGISTER_ATTEMPT_WINDOW_SECONDS: int = 3600
+    OAUTH_STATE_TTL_SECONDS: int = 600
+    OAUTH_STATE_MAX_ENTRIES: int = 1000
 
     # OAuth - Google
     GOOGLE_CLIENT_ID: Optional[str] = None
@@ -90,6 +92,8 @@ class Settings(BaseSettings):
         """JWT Secret 반환 (없으면 자동 생성)"""
         if self.JWT_SECRET_KEY:
             return self.JWT_SECRET_KEY
+        if not self.DEBUG:
+            raise ValueError("DEBUG=False 환경에서는 JWT_SECRET_KEY를 반드시 설정해야 합니다.")
         # 개발 환경용 임시 시크릿 (재시작시 변경됨)
         print("⚠️  JWT_SECRET_KEY가 설정되지 않았습니다. 임시 키를 사용합니다.")
         return secrets.token_urlsafe(32)

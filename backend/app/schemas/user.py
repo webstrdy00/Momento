@@ -53,6 +53,18 @@ class UserUpdate(BaseModel):
         return value
 
 
+class UserDeleteRequest(BaseModel):
+    """회원 탈퇴 요청 확인값"""
+    confirmation_text: str = Field(..., min_length=4, max_length=20)
+
+    @field_validator("confirmation_text")
+    @classmethod
+    def validate_confirmation_text(cls, value: str) -> str:
+        if value.strip() != "회원탈퇴":
+            raise ValueError("회원 탈퇴 확인 문구가 올바르지 않습니다.")
+        return value.strip()
+
+
 class UserResponse(UserBase):
     """User 응답 스키마"""
     id: UUID

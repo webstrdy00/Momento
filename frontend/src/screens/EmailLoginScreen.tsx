@@ -35,12 +35,16 @@ const EmailLoginScreen = ({ navigation }: any) => {
     try {
       const result = await login({ email: email.trim(), password });
 
-      console.log('✅ 로그인 성공:', result.user.email);
+      if (__DEV__) {
+        console.log('✅ 로그인 성공');
+      }
 
       // AuthContext 업데이트
       setUser(result.user);
     } catch (error: any) {
-      console.error('❌ 로그인 실패:', error);
+      if (__DEV__) {
+        console.error('❌ 로그인 실패:', error);
+      }
 
       const message =
         error.response?.data?.detail ||

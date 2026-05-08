@@ -99,10 +99,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const state = params.get('state');
 
           if (code) {
-            console.log('📱 Google OAuth 콜백 처리');
+            if (__DEV__) {
+              console.log('📱 Google OAuth 콜백 처리');
+            }
             const result = await handleGoogleCallback(code, state || undefined);
             setUser(result.user);
-            console.log('✅ Google 로그인 성공:', result.user.email);
+            if (__DEV__) {
+              console.log('✅ Google 로그인 성공');
+            }
           }
           return;
         }
@@ -116,14 +120,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const state = params.get('state');
 
           if (code) {
-            console.log('📱 Kakao OAuth 콜백 처리');
+            if (__DEV__) {
+              console.log('📱 Kakao OAuth 콜백 처리');
+            }
             const result = await handleKakaoCallback(code, state || undefined);
             setUser(result.user);
-            console.log('✅ Kakao 로그인 성공:', result.user.email);
+            if (__DEV__) {
+              console.log('✅ Kakao 로그인 성공');
+            }
           }
         }
       } catch (error) {
-        console.error('❌ OAuth 콜백 처리 실패:', error);
+        if (__DEV__) {
+          console.error('❌ OAuth 콜백 처리 실패:', error);
+        }
         throw error;
       }
     })();
@@ -150,13 +160,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       };
 
       try {
-        console.log('🚀 initAuth 시작');
+        if (__DEV__) {
+          console.log('🚀 initAuth 시작');
+        }
 
         // 저장된 토큰 확인
         const accessToken = await getAccessToken();
 
         if (!accessToken) {
-          console.log('📱 저장된 토큰 없음');
+          if (__DEV__) {
+            console.log('📱 저장된 토큰 없음');
+          }
           await finishLoading();
           return;
         }
@@ -166,16 +180,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (mounted) {
           if (currentUser) {
-            console.log('✅ 사용자 복원:', currentUser.email);
+            if (__DEV__) {
+              console.log('✅ 사용자 복원');
+            }
             setUser(currentUser);
           } else {
-            console.log('❌ 토큰 만료 또는 유효하지 않음');
+            if (__DEV__) {
+              console.log('❌ 토큰 만료 또는 유효하지 않음');
+            }
             await clearTokens();
           }
         }
         await finishLoading();
       } catch (error) {
-        console.error('❌ initAuth 실패:', error);
+        if (__DEV__) {
+          console.error('❌ initAuth 실패:', error);
+        }
         if (mounted && !isAuthSessionUnavailableError(error)) {
           await clearTokens();
         }
@@ -186,7 +206,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // 401 처리 콜백 등록
     setOnUnauthorized(() => {
       if (!mounted) return;
-      console.log('🔒 401 에러 감지 - 세션 초기화');
+      if (__DEV__) {
+        console.log('🔒 401 에러 감지 - 세션 초기화');
+      }
       setUser(null);
     });
 
@@ -239,13 +261,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
   };
 
-  const refreshUser = async () => {
+    const refreshUser = async () => {
     try {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
     } catch (error) {
       if (isAuthSessionUnavailableError(error)) {
-        console.error('❌ 사용자 새로고침 실패:', error);
+        if (__DEV__) {
+          console.error('❌ 사용자 새로고침 실패:', error);
+        }
         return;
       }
 

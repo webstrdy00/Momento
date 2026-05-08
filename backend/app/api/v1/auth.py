@@ -6,6 +6,7 @@ import base64
 import hashlib
 import json
 import secrets
+import time
 from html import escape
 from ipaddress import ip_address
 from string import Template
@@ -52,8 +53,8 @@ from app.services.response_serializers import serialize_auth_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# OAuth state 임시 저장 (프로덕션에서는 Redis 사용 권장)
-_oauth_states: dict[str, dict[str, str | None]] = {}
+# OAuth state 임시 저장. 단일 인스턴스용 fallback이므로 TTL과 상한을 둔다.
+_oauth_states: dict[str, dict[str, str | float | None]] = {}
 
 
 def _normalize_oauth_client(client: str | None) -> str:
@@ -73,6 +74,30 @@ def _build_pkce_pair() -> tuple[str, str]:
     return verifier, challenge
 
 
+def _prune_oauth_states(now: float | None = None) -> None:
+    current_time = now if now is not None else time.monotonic()
+    expires_before = current_time - settings.OAUTH_STATE_TTL_SECONDS
+
+    expired_states = [
+        state
+        for state, payload in _oauth_states.items()
+        if float(payload.get("created_at") or 0) < expires_before
+    ]
+    for state in expired_states:
+        _oauth_states.pop(state, None)
+
+    overflow_count = len(_oauth_states) - settings.OAUTH_STATE_MAX_ENTRIES
+    if overflow_count <= 0:
+        return
+
+    oldest_states = sorted(
+        _oauth_states.items(),
+        key=lambda item: float(item[1].get("created_at") or 0),
+    )[:overflow_count]
+    for state, _ in oldest_states:
+        _oauth_states.pop(state, None)
+
+
 def _store_oauth_state(
     state: str,
     provider: str,
@@ -80,11 +105,14 @@ def _store_oauth_state(
     *,
     code_verifier: str | None = None,
 ) -> None:
+    _prune_oauth_states()
     _oauth_states[state] = {
         "provider": provider,
         "client": client,
         "code_verifier": code_verifier,
+        "created_at": time.monotonic(),
     }
+    _prune_oauth_states()
 
 
 def _consume_oauth_state(state: str | None, provider: str) -> tuple[str, str | None]:
@@ -102,6 +130,7 @@ def _consume_oauth_state(state: str | None, provider: str) -> tuple[str, str | N
             detail="state 값이 필요합니다.",
         )
 
+    _prune_oauth_states()
     saved_state = _oauth_states.pop(state, None)
     if not saved_state:
         raise HTTPException(

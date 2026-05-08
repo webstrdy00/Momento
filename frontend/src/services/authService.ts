@@ -184,7 +184,9 @@ export const logout = async (): Promise<void> => {
     await api.post(`${AUTH_BASE}/logout`);
   } catch (error) {
     // 서버 에러는 무시
-    console.log('Logout API error (ignored):', error);
+    if (__DEV__) {
+      console.log('Logout API error (ignored):', error);
+    }
   }
 
   await clearTokens();

@@ -123,7 +123,7 @@ api.interceptors.request.use(
       if (accessToken) {
         config.headers.Authorization = `Bearer ${accessToken}`;
         if (__DEV__) {
-          console.log('🔑 JWT 토큰 설정:', accessToken.substring(0, 20) + '...');
+          console.log('🔑 JWT 토큰 설정');
         }
       } else if (__DEV__) {
         console.warn('⚠️ 세션 없음 - 로그인 필요');
@@ -233,7 +233,9 @@ api.interceptors.response.use(
       } catch (refreshError) {
         onTokenRefreshFailed(refreshError);
 
-        console.log('🔒 토큰 갱신 실패 - 로그아웃');
+        if (__DEV__) {
+          console.log('🔒 토큰 갱신 실패 - 로그아웃');
+        }
         await clearTokens();
 
         if (onUnauthorized) {

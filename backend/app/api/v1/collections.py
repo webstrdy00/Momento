@@ -24,6 +24,19 @@ def normalize_status_output(status: str | None) -> str | None:
     return status
 
 
+def validate_auto_rules_or_raise(auto_rules: dict | None) -> None:
+    if auto_rules is None:
+        return
+
+    try:
+        auto_collection_service.validate_auto_rule(auto_rules)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="자동 컬렉션 규칙이 올바르지 않습니다.",
+        )
+
+
 @router.get("/", response_model=BaseResponse[List[CollectionResponse]])
 async def get_user_collections(
     db: Session = Depends(get_db),
@@ -182,6 +195,8 @@ async def create_collection(
     - cover_image_url: Cover image URL (optional)
     - auto_rules: Auto collection rules (JSONB, optional, only for is_auto=True)
     """
+    validate_auto_rules_or_raise(collection_data.auto_rules)
+
     # Create collection
     collection = Collection(
         user_id=user_id,
@@ -242,6 +257,9 @@ async def update_collection(
 
     # Update only provided fields
     update_dict = update_data.model_dump(exclude_unset=True)
+    if "auto_rules" in update_dict:
+        validate_auto_rules_or_raise(update_dict["auto_rules"])
+
     for field, value in update_dict.items():
         setattr(collection, field, value)
 
@@ -498,13 +516,14 @@ async def sync_auto_collection(
             data=result
         )
 
-    except ValueError as e:
+    except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="자동 컬렉션 규칙이 올바르지 않습니다."
         )
     except Exception as e:
+        print(f"자동 컬렉션 동기화 실패: {type(e).__name__}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"동기화 실패: {str(e)}"
+            detail="컬렉션 동기화에 실패했습니다."
         )

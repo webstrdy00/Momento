@@ -49,7 +49,9 @@ export const updateUserProfile = async (data: UserUpdate): Promise<User> => {
 /**
  * 회원 탈퇴
  */
-export const deleteUser = async (): Promise<void> => {
-  const response = await api.delete('/api/v1/users/me');
+export const deleteUser = async (confirmationText: string): Promise<void> => {
+  const response = await api.delete('/api/v1/users/me', {
+    data: { confirmation_text: confirmationText },
+  });
   unwrapResponse<any>(response);
 };

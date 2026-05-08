@@ -72,33 +72,47 @@ export default function HomeScreen() {
       setLoading(true)
       setError(false)
 
-      console.log('📡 HomeScreen: API 호출 시작')
+      if (__DEV__) {
+        console.log('📡 HomeScreen: API 호출 시작')
+      }
 
       // API 호출
       const [statsData, watchingData, watchlistData, collectionsData, streakDataResult] = await Promise.all([
         getOverallStats(currentYear).catch((err) => {
-          console.error('❌ getOverallStats 실패:', err.message)
+          if (__DEV__) {
+            console.error('❌ getOverallStats 실패:', err.message)
+          }
           return null
         }),
         getMovies('watching').catch((err) => {
-          console.error('❌ getMovies(watching) 실패:', err.message)
+          if (__DEV__) {
+            console.error('❌ getMovies(watching) 실패:', err.message)
+          }
           return []
         }),
         getMovies('watchlist').catch((err) => {
-          console.error('❌ getMovies(watchlist) 실패:', err.message)
+          if (__DEV__) {
+            console.error('❌ getMovies(watchlist) 실패:', err.message)
+          }
           return []
         }),
         getCollections().catch((err) => {
-          console.error('❌ getCollections 실패:', err.message)
+          if (__DEV__) {
+            console.error('❌ getCollections 실패:', err.message)
+          }
           return []
         }),
         getStreakData().catch((err) => {
-          console.error('❌ getStreakData 실패:', err.message)
+          if (__DEV__) {
+            console.error('❌ getStreakData 실패:', err.message)
+          }
           return null
         }),
       ])
 
-      console.log('✅ HomeScreen: API 호출 완료', { statsData, watchingData, watchlistData, collectionsData, streakDataResult })
+      if (__DEV__) {
+        console.log('✅ HomeScreen: API 호출 완료')
+      }
 
       setStats(statsData || defaultStats)
       setWatchingMovies(watchingData)
@@ -106,7 +120,9 @@ export default function HomeScreen() {
       setCollections(collectionsData)
       setStreakData(streakDataResult)
     } catch (error: any) {
-      console.error('❌ HomeScreen 데이터 로드 실패:', error.message, error)
+      if (__DEV__) {
+        console.error('❌ HomeScreen 데이터 로드 실패:', error.message, error)
+      }
       setError(true)
     } finally {
       setLoading(false)

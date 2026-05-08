@@ -22,17 +22,17 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     """이메일 로그인 요청"""
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=1, max_length=PASSWORD_MAX_LENGTH)
 
 
 class RefreshRequest(BaseModel):
     """토큰 갱신 요청"""
-    refresh_token: str
+    refresh_token: str = Field(..., min_length=1, max_length=4096)
 
 
 class ChangePasswordRequest(BaseModel):
     """비밀번호 변경 요청"""
-    current_password: str
+    current_password: str = Field(..., min_length=1, max_length=PASSWORD_MAX_LENGTH)
     new_password: str = Field(..., min_length=1, max_length=PASSWORD_MAX_LENGTH)
 
 
@@ -43,14 +43,14 @@ class PasswordResetRequest(BaseModel):
 
 class PasswordResetConfirmRequest(BaseModel):
     """비밀번호 재설정 완료 요청"""
-    token: str
+    token: str = Field(..., min_length=1, max_length=512)
     new_password: str = Field(..., min_length=1, max_length=PASSWORD_MAX_LENGTH)
 
 
 class OAuthCallbackRequest(BaseModel):
     """OAuth 콜백 요청"""
-    code: str
-    state: Optional[str] = None
+    code: str = Field(..., min_length=1, max_length=2048)
+    state: Optional[str] = Field(None, min_length=1, max_length=512)
 
 
 # ===========================

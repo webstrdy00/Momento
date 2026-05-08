@@ -10,7 +10,7 @@ from app.models.user_movie import UserMovie
 from app.models.movie import Movie
 from app.models.movie_tag import MovieTag
 from app.models.tag import Tag
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from app.schemas.stats import (
     StatsOverview, MonthlyStats, GenreStats, TagStats, BestMovie,
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 
 @router.get("/", response_model=BaseResponse[StatsOverview])
 async def get_user_stats(
-    year: int = Query(default=datetime.now().year, description="Year for statistics"),
+    year: int = Query(default=datetime.now().year, ge=1888, le=2100, description="Year for statistics"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
@@ -144,7 +144,7 @@ async def get_user_stats(
 
 @router.get("/monthly", response_model=BaseResponse[List[MonthlyStats]])
 async def get_monthly_stats(
-    months: int = Query(default=6, description="Number of months to fetch"),
+    months: int = Query(default=6, ge=1, le=36, description="Number of months to fetch"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
@@ -238,7 +238,7 @@ async def get_genre_stats(
 
 @router.get("/tags", response_model=BaseResponse[List[TagStats]])
 async def get_tag_stats(
-    limit: int = Query(default=10, description="Number of top tags to return"),
+    limit: int = Query(default=10, ge=1, le=50, description="Number of top tags to return"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
@@ -274,7 +274,7 @@ async def get_tag_stats(
 
 @router.get("/best-movies", response_model=BaseResponse[List[BestMovie]])
 async def get_best_movies(
-    limit: int = Query(default=5, description="Number of best movies to return"),
+    limit: int = Query(default=5, ge=1, le=50, description="Number of best movies to return"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
@@ -383,8 +383,8 @@ async def get_streak(
 
 @router.get("/streak/dates", response_model=BaseResponse[StreakDates])
 async def get_streak_dates(
-    year: int = Query(default=None, description="Year"),
-    month: int = Query(default=None, description="Month"),
+    year: int | None = Query(default=None, ge=1888, le=2100, description="Year"),
+    month: int | None = Query(default=None, ge=1, le=12, description="Month"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):
@@ -426,8 +426,8 @@ async def get_streak_dates(
 
 
 class StreakSettingsUpdate(BaseModel):
-    streak_type: Optional[str] = None
-    streak_min_days: Optional[int] = None
+    streak_type: Optional[str] = Field(None, pattern="^(daily|weekly|custom)$")
+    streak_min_days: Optional[int] = Field(None, ge=1, le=7)
 
 
 @router.put("/streak/settings", response_model=BaseResponse[StreakData])
@@ -495,8 +495,8 @@ async def update_streak_settings(
 
 @router.get("/calendar", response_model=BaseResponse[CalendarMonth])
 async def get_calendar(
-    year: int = Query(default=None, description="Year"),
-    month: int = Query(default=None, description="Month"),
+    year: int | None = Query(default=None, ge=1888, le=2100, description="Year"),
+    month: int | None = Query(default=None, ge=1, le=12, description="Month"),
     db: Session = Depends(get_db),
     user_id: str = Depends(get_current_user),
 ):

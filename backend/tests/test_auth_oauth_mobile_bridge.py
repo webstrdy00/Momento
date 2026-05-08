@@ -13,6 +13,7 @@ from app.api.v1.auth import (
     _is_google_email_verified,
     _is_kakao_email_verified,
     _oauth_states,
+    _prune_oauth_states,
     _render_mobile_oauth_bridge_page,
     _store_oauth_state,
     google_auth_start,
@@ -41,6 +42,45 @@ def test_consume_oauth_state_returns_redirect_client_and_pops_state() -> None:
 
     assert _consume_oauth_state("state-123", "google") == ("mobile", "verifier-123")
     assert "state-123" not in _oauth_states
+
+
+def test_prune_oauth_state_removes_expired_and_oldest_entries(monkeypatch) -> None:
+    _oauth_states.clear()
+    monkeypatch.setattr(settings, "OAUTH_STATE_TTL_SECONDS", 10)
+    monkeypatch.setattr(settings, "OAUTH_STATE_MAX_ENTRIES", 2)
+
+    _oauth_states.update(
+        {
+            "expired": {
+                "provider": "google",
+                "client": "web",
+                "code_verifier": None,
+                "created_at": 1.0,
+            },
+            "old": {
+                "provider": "google",
+                "client": "web",
+                "code_verifier": None,
+                "created_at": 20.0,
+            },
+            "newer": {
+                "provider": "kakao",
+                "client": "mobile",
+                "code_verifier": None,
+                "created_at": 21.0,
+            },
+            "newest": {
+                "provider": "kakao",
+                "client": "mobile",
+                "code_verifier": None,
+                "created_at": 22.0,
+            },
+        }
+    )
+
+    _prune_oauth_states(now=23.0)
+
+    assert set(_oauth_states) == {"newer", "newest"}
 
 
 def test_render_mobile_oauth_bridge_page_contains_app_callback_url() -> None:

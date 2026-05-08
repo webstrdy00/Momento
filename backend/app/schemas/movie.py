@@ -7,24 +7,35 @@ from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, Field
 
+TITLE_MAX_LENGTH = 255
+SHORT_TEXT_MAX_LENGTH = 255
+EXTERNAL_ID_MAX_LENGTH = 50
+URL_MAX_LENGTH = 2048
+SYNOPSIS_MAX_LENGTH = 5000
+REVIEW_MAX_LENGTH = 2000
+PRODUCTION_YEAR_MIN = 0
+PRODUCTION_YEAR_MAX = 2100
+RUNTIME_MAX_MINUTES = 24 * 60 * 100
+PROGRESS_MAX_MINUTES = 24 * 60 * 100
+
 
 class MovieBase(BaseModel):
     """Movie 기본 스키마"""
-    title: str = Field(..., alias="title_ko")
-    original_title: Optional[str] = Field(None, alias="title_original")
+    title: str = Field(..., alias="title_ko", min_length=1, max_length=TITLE_MAX_LENGTH)
+    original_title: Optional[str] = Field(None, alias="title_original", max_length=TITLE_MAX_LENGTH)
     content_type: str = Field("movie", pattern="^(movie|series)$")
     release_channel: str = Field("unknown", pattern="^(theatrical|ott_original|tv|unknown)$")
-    director: Optional[str] = None
-    year: Optional[int] = Field(None, alias="production_year")
-    runtime: Optional[int] = None  # minutes
-    total_episodes: Optional[int] = Field(None, ge=0)
-    genre: Optional[str] = None  # comma-separated
-    poster_url: Optional[str] = None
-    backdrop_url: Optional[str] = None
-    synopsis: Optional[str] = None
-    kobis_code: Optional[str] = None
+    director: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)
+    year: Optional[int] = Field(None, alias="production_year", ge=PRODUCTION_YEAR_MIN, le=PRODUCTION_YEAR_MAX)
+    runtime: Optional[int] = Field(None, ge=0, le=RUNTIME_MAX_MINUTES)  # minutes
+    total_episodes: Optional[int] = Field(None, ge=0, le=10000)
+    genre: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)  # comma-separated
+    poster_url: Optional[str] = Field(None, max_length=URL_MAX_LENGTH)
+    backdrop_url: Optional[str] = Field(None, max_length=URL_MAX_LENGTH)
+    synopsis: Optional[str] = Field(None, max_length=SYNOPSIS_MAX_LENGTH)
+    kobis_code: Optional[str] = Field(None, max_length=EXTERNAL_ID_MAX_LENGTH)
     tmdb_id: Optional[int] = None
-    kmdb_id: Optional[str] = None
+    kmdb_id: Optional[str] = Field(None, max_length=EXTERNAL_ID_MAX_LENGTH)
 
     class Config:
         from_attributes = True
@@ -54,14 +65,14 @@ class UserMovieBase(BaseModel):
     # 레거시(wishlist) + 현재 프론트(watchlist) 모두 허용
     status: str = Field(..., pattern="^(wishlist|watchlist|watching|completed)$")
     rating: Optional[float] = Field(None, ge=0, le=5)  # 0~5, 0.5 단위 허용
-    one_line_review: Optional[str] = None  # 모델과 일치
+    one_line_review: Optional[str] = Field(None, max_length=REVIEW_MAX_LENGTH)  # 모델과 일치
     watch_date: Optional[date] = None
-    progress: Optional[int] = None  # minutes watched
-    current_season: Optional[int] = Field(None, ge=0)
-    current_episode: Optional[int] = Field(None, ge=0)
+    progress: Optional[int] = Field(None, ge=0, le=PROGRESS_MAX_MINUTES)  # minutes watched
+    current_season: Optional[int] = Field(None, ge=0, le=10000)
+    current_episode: Optional[int] = Field(None, ge=0, le=100000)
     watch_method: Optional[str] = Field(None, pattern="^(theater|ott|tv|other)$")
-    watch_location: Optional[str] = None
-    watched_with: Optional[str] = None
+    watch_location: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)
+    watched_with: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)
     is_best_movie: bool = False  # 모델과 일치
 
 
@@ -74,20 +85,20 @@ class UserMovieUpdate(BaseModel):
     """UserMovie 업데이트 스키마"""
     status: Optional[str] = Field(None, pattern="^(wishlist|watchlist|watching|completed)$")
     rating: Optional[float] = Field(None, ge=0, le=5)
-    one_line_review: Optional[str] = None
+    one_line_review: Optional[str] = Field(None, max_length=REVIEW_MAX_LENGTH)
     watch_date: Optional[date] = None
-    progress: Optional[int] = None
-    current_season: Optional[int] = Field(None, ge=0)
-    current_episode: Optional[int] = Field(None, ge=0)
+    progress: Optional[int] = Field(None, ge=0, le=PROGRESS_MAX_MINUTES)
+    current_season: Optional[int] = Field(None, ge=0, le=10000)
+    current_episode: Optional[int] = Field(None, ge=0, le=100000)
     watch_method: Optional[str] = Field(None, pattern="^(theater|ott|tv|other)$")
-    watch_location: Optional[str] = None
-    watched_with: Optional[str] = None
+    watch_location: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)
+    watched_with: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)
     is_best_movie: Optional[bool] = None
-    genre: Optional[str] = None  # Movie 테이블 업데이트용
-    runtime: Optional[int] = None  # Movie 테이블 업데이트용
+    genre: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)  # Movie 테이블 업데이트용
+    runtime: Optional[int] = Field(None, ge=0, le=RUNTIME_MAX_MINUTES)  # Movie 테이블 업데이트용
     content_type: Optional[str] = Field(None, pattern="^(movie|series)$")  # Movie 테이블 업데이트용
     release_channel: Optional[str] = Field(None, pattern="^(theatrical|ott_original|tv|unknown)$")  # Movie 테이블 업데이트용
-    total_episodes: Optional[int] = Field(None, ge=0)  # Movie 테이블 업데이트용
+    total_episodes: Optional[int] = Field(None, ge=0, le=10000)  # Movie 테이블 업데이트용
 
 
 class UserMovieResponse(UserMovieBase):
@@ -127,8 +138,8 @@ class FlatMovieResponse(BaseModel):
 
     # Movie 필드 (평평하게 - 필드명 변경)
     movie_id: int
-    title: str
-    original_title: Optional[str] = None
+    title: str = Field(..., min_length=1, max_length=TITLE_MAX_LENGTH)
+    original_title: Optional[str] = Field(None, max_length=TITLE_MAX_LENGTH)
     content_type: str = "movie"
     release_channel: str = "unknown"
     poster: Optional[str] = None  # poster_url → poster
@@ -155,34 +166,34 @@ class MovieSearchResult(BaseModel):
     original_title: Optional[str] = None
     content_type: str = Field("movie", pattern="^(movie|series)$")
     release_channel: str = Field("unknown", pattern="^(theatrical|ott_original|tv|unknown)$")
-    director: Optional[str] = None
-    year: int
-    runtime: Optional[int] = None
-    total_episodes: Optional[int] = Field(None, ge=0)
-    genre: Optional[str] = None
-    poster_url: Optional[str] = None
-    backdrop_url: Optional[str] = None
-    synopsis: Optional[str] = None
-    kobis_code: Optional[str] = None
+    director: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)
+    year: int = Field(..., ge=PRODUCTION_YEAR_MIN, le=PRODUCTION_YEAR_MAX)
+    runtime: Optional[int] = Field(None, ge=0, le=RUNTIME_MAX_MINUTES)
+    total_episodes: Optional[int] = Field(None, ge=0, le=10000)
+    genre: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)
+    poster_url: Optional[str] = Field(None, max_length=URL_MAX_LENGTH)
+    backdrop_url: Optional[str] = Field(None, max_length=URL_MAX_LENGTH)
+    synopsis: Optional[str] = Field(None, max_length=SYNOPSIS_MAX_LENGTH)
+    kobis_code: Optional[str] = Field(None, max_length=EXTERNAL_ID_MAX_LENGTH)
     tmdb_id: Optional[int] = None
-    kmdb_id: Optional[str] = None
+    kmdb_id: Optional[str] = Field(None, max_length=EXTERNAL_ID_MAX_LENGTH)
     source: str  # "kobis", "tmdb", "kmdb"
 
 
 class MovieMetadata(BaseModel):
     """영화 메타데이터 (외부 API에서 가져온 상세 정보)"""
-    title: str
-    original_title: Optional[str] = None
+    title: str = Field(..., min_length=1, max_length=TITLE_MAX_LENGTH)
+    original_title: Optional[str] = Field(None, max_length=TITLE_MAX_LENGTH)
     content_type: str = Field("movie", pattern="^(movie|series)$")
     release_channel: str = Field("unknown", pattern="^(theatrical|ott_original|tv|unknown)$")
-    director: Optional[str] = None
-    year: Optional[int] = None
-    runtime: Optional[int] = None
-    total_episodes: Optional[int] = Field(None, ge=0)
-    genre: Optional[str] = None
-    poster_url: Optional[str] = None
-    backdrop_url: Optional[str] = None
-    synopsis: Optional[str] = None
-    kobis_code: Optional[str] = None
+    director: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)
+    year: Optional[int] = Field(None, ge=PRODUCTION_YEAR_MIN, le=PRODUCTION_YEAR_MAX)
+    runtime: Optional[int] = Field(None, ge=0, le=RUNTIME_MAX_MINUTES)
+    total_episodes: Optional[int] = Field(None, ge=0, le=10000)
+    genre: Optional[str] = Field(None, max_length=SHORT_TEXT_MAX_LENGTH)
+    poster_url: Optional[str] = Field(None, max_length=URL_MAX_LENGTH)
+    backdrop_url: Optional[str] = Field(None, max_length=URL_MAX_LENGTH)
+    synopsis: Optional[str] = Field(None, max_length=SYNOPSIS_MAX_LENGTH)
+    kobis_code: Optional[str] = Field(None, max_length=EXTERNAL_ID_MAX_LENGTH)
     tmdb_id: Optional[int] = None
-    kmdb_id: Optional[str] = None
+    kmdb_id: Optional[str] = Field(None, max_length=EXTERNAL_ID_MAX_LENGTH)
